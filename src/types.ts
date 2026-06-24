@@ -2,6 +2,8 @@
  * Pi Fusion shared types
  */
 
+import type { WorkspaceChangeSet, WorkspaceSandbox } from "./workspace-sandbox.js";
+
 // === Configuration ===
 
 export interface ModelSlot {
@@ -72,6 +74,56 @@ export interface FusionInput {
   monitor: boolean;
   /** Optional pre-run evidence collected by the Pi extension, such as user-approved local files. */
   initialEvidence?: EvidenceEntry[];
+  /**
+   * Optional isolated workspace support for project-sized tasks.
+   *
+   * Pi itself has no built-in sandbox; this copies the source workspace into
+   * Pi Fusion-owned participant sandboxes and only exposes those copies through
+   * scoped workspace tools.
+   */
+  workspace?: WorkspaceRunInput;
+}
+
+export interface WorkspaceRunInput {
+  enabled: boolean;
+  sourceRoot: string;
+  root: string;
+}
+
+export interface ParticipantWorkspaceContext {
+  sandbox: WorkspaceSandbox;
+  sourceRoot: string;
+  baselineSha256: string;
+  fileCount: number;
+  skippedCount: number;
+}
+
+export interface WorkspaceChangedFile {
+  op: "add" | "modify" | "delete";
+  path: string;
+  size?: number;
+}
+
+export interface ParticipantWorkspaceSummary {
+  sandboxId: string;
+  root: string;
+  sourceRoot: string;
+  baselineSha256: string;
+  fileCount: number;
+  skippedCount: number;
+  changedFiles: WorkspaceChangedFile[];
+  changeSet?: WorkspaceChangeSet;
+  error?: string;
+}
+
+export interface WorkspaceRunSummary {
+  enabled: boolean;
+  sourceRoot: string;
+  root: string;
+  baselineSha256: string;
+  fileCount: number;
+  skippedCount: number;
+  participantCount: number;
 }
 
 // === Participant ===
@@ -91,6 +143,7 @@ export interface ParticipantOutput {
   tokens: TokenUsage;
   cost: number;
   fallbackUsed?: string;
+  workspace?: ParticipantWorkspaceSummary;
   error?: string;
 }
 
@@ -116,6 +169,7 @@ export interface ModelCallRequest {
   toolContext?: {
     participantSlotIndex?: number;
     judge?: boolean;
+    workspace?: ParticipantWorkspaceContext;
   };
   onEvidence?: (entry: EvidenceEntry) => void;
   signal?: AbortSignal;
@@ -239,6 +293,7 @@ export interface FusionResult {
   participants: ParticipantStatus[];
   evidence: EvidenceSummary;
   evidencePool?: EvidencePool;
+  workspace?: WorkspaceRunSummary;
   artifactsPath: string;
   mode: FusionMode;
   totalCost: number;

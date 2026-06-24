@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { ArtifactWriter } from "../src/artifacts.js";
 import type { FusionResult, StructuredJudgeAnalysis } from "../src/types.js";
+import type { WorkspaceChangeSet } from "../src/workspace-sandbox.js";
 
 const MOCK_RESULT: FusionResult = {
   finalAnswer: "The best approach is X because Y.",
@@ -98,5 +99,72 @@ describe("ArtifactWriter", () => {
 
     const p2 = await fs.readFile(path.join(artifactsPath, "participant-2.md"), "utf-8");
     expect(p2).toContain("SKIPPED");
+  });
+
+  it("writes workspace sandbox summaries and participant changesets", async () => {
+    const changeSet: WorkspaceChangeSet = {
+      version: 1,
+      sandboxId: "p1",
+      baselineSha256: "a".repeat(64),
+      operations: [{
+        op: "add",
+        path: "notes/p1.md",
+        contentBase64: Buffer.from("notes", "utf-8").toString("base64"),
+        mode: 0o644,
+        sha256: "b".repeat(64),
+        size: 5,
+      }],
+    };
+    const result: FusionResult = {
+      ...MOCK_RESULT,
+      workspace: {
+        enabled: true,
+        sourceRoot: "/tmp/source",
+        root: "/tmp/sandboxes",
+        baselineSha256: "a".repeat(64),
+        fileCount: 1,
+        skippedCount: 0,
+        participantCount: 1,
+      },
+      participants: [
+        {
+          state: "success",
+          slotIndex: 0,
+          output: {
+            slotIndex: 0,
+            model: "openai/gpt-4.1",
+            answer: "Answer with workspace",
+            evidence: [],
+            tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+            cost: 0,
+            workspace: {
+              sandboxId: "p1",
+              root: "/tmp/sandboxes/participants/p1",
+              sourceRoot: "/tmp/source",
+              baselineSha256: "a".repeat(64),
+              fileCount: 1,
+              skippedCount: 0,
+              changedFiles: [{ op: "add", path: "notes/p1.md", size: 5 }],
+              changeSet,
+            },
+          },
+        },
+      ],
+    };
+
+    const writer = new ArtifactWriter(tmpDir);
+    const artifactsPath = await writer.write(result);
+
+    const sandboxes = JSON.parse(await fs.readFile(path.join(artifactsPath, "participant-sandboxes.json"), "utf-8"));
+    expect(sandboxes.workspace.root).toBe("/tmp/sandboxes");
+    expect(sandboxes.participants[0].changedFiles).toEqual([{ op: "add", path: "notes/p1.md", size: 5 }]);
+    expect(sandboxes.participants[0].changeSet).toBeUndefined();
+
+    const writtenChangeSet = JSON.parse(await fs.readFile(path.join(artifactsPath, "participant-1-changeset.json"), "utf-8"));
+    expect(writtenChangeSet.operations[0].path).toBe("notes/p1.md");
+
+    const p1 = await fs.readFile(path.join(artifactsPath, "participant-1.md"), "utf-8");
+    expect(p1).toContain("Workspace Sandbox");
+    expect(p1).toContain("add notes/p1.md");
   });
 });

@@ -19,6 +19,7 @@ Pi Fusion provides a general-purpose fusion layer for tasks where one model answ
 - optional verification/revision loop
 - optional web/evidence tools
 - sandboxed bash for deterministic calculations
+- per-participant workspace sandboxes with read/write tools
 - model fallback and retry policy
 - artifacts, evidence summaries, token usage, and cost reporting
 - Pi-native commands and configuration
@@ -162,6 +163,12 @@ Pi Fusion can parse common fetch shapes with `content`, `text`, or `markdown`.
 
 You may use private MCP servers, company search, local crawlers, or hosted search APIs behind the MCP interface. Provider-specific backends such as `unified-search` should be treated as optional compatible implementations, not core Pi Fusion dependencies.
 
+## Workspace sandboxes
+
+For project-sized prompts, Pi Fusion copies the current Pi working directory into a Pi Fusion-owned baseline and creates one isolated writable sandbox per Participant Model. Participants can list, search, read, write, and edit files only inside their own sandbox through scoped `workspace_*` tools.
+
+Sandbox writes do not modify the real user workspace. After the run, Pi Fusion records each participant's sandbox root, changed files, and ChangeSet artifacts under the run directory so the judge and user can review concrete file-level work instead of relying only on prose.
+
 ## Benchmarks
 
 Pi Fusion exceeds the Fusion API budget baseline on the DRACO 10-case benchmark.
@@ -190,7 +197,9 @@ npm test
 
 ## Security
 
-Pi extensions run with your local permissions. Review source before installing third-party packages. Pi Fusion's bash tool is sandboxed and intended for deterministic calculations, not arbitrary host access.
+Pi extensions run with your local permissions. Review source before installing third-party packages. Pi itself does not provide an in-process security sandbox. Pi Fusion therefore treats workspace sandboxes as product-level isolation: files are copied into participant-owned directories, participant writes stay there, and applying any ChangeSet to the real workspace is deliberately separate from a Fusion Run.
+
+Pi Fusion's bash tool is sandboxed and intended for deterministic calculations, not arbitrary host access.
 
 ## License
 

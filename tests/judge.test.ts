@@ -346,6 +346,45 @@ describe("JudgeRunner", () => {
     expect(userMessages.join("\n")).toContain("Example Source (https://example.com/source)");
   });
 
+  it("includes participant workspace changed files in judge prompts", async () => {
+    const userMessages: string[] = [];
+    const caller: ModelCaller = {
+      async call(request) {
+        userMessages.push(request.messages.map((m) => m.content).join("\n"));
+        return {
+          answer: JSON.stringify(MOCK_ANALYSIS),
+          model: request.model,
+          tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+          cost: 0,
+        };
+      },
+    };
+    const participants: ParticipantOutput[] = [{
+      ...PARTICIPANTS[0],
+      workspace: {
+        sandboxId: "p1",
+        root: "/tmp/pi-fusion/p1",
+        sourceRoot: "/tmp/project",
+        baselineSha256: "a".repeat(64),
+        fileCount: 2,
+        skippedCount: 1,
+        changedFiles: [
+          { op: "modify", path: "src/app.ts", size: 120 },
+          { op: "add", path: "notes/plan.md", size: 40 },
+        ],
+      },
+    }];
+    const judge = new JudgeRunner(caller, "test-model");
+
+    await judge.analyze("prompt", participants, EMPTY_EVIDENCE);
+
+    const promptText = userMessages.join("\n");
+    expect(promptText).toContain("Workspace Sandbox");
+    expect(promptText).toContain("Sandbox: p1");
+    expect(promptText).toContain("modify src/app.ts (120 bytes)");
+    expect(promptText).toContain("add notes/plan.md (40 bytes)");
+  });
+
   it("passes configured tools to judge phases and merges judge evidence", async () => {
     const calls: Array<{ tools?: string[]; judge?: boolean }> = [];
     const caller: ModelCaller = {

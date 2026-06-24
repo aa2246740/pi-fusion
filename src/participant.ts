@@ -6,6 +6,7 @@ import type {
   TokenUsage,
   EvidenceEntry,
   RetryPolicy,
+  ParticipantWorkspaceContext,
 } from "./types.js";
 import { FallbackResolver } from "./fallback.js";
 import { callModelWithRetry, classifyModelError, NO_MODEL_RETRY_POLICY } from "./retry.js";
@@ -15,6 +16,7 @@ Answer the user's question independently. Use any available tools to gather info
 When web tools are available, use web_search to find candidate sources, then use web_fetch on the most authoritative URLs before making precise factual, product, legal, financial, or citation-sensitive claims. For long filings, reports, PDFs, or documentation pages, call web_fetch with focused terms for the exact metric/entity you need instead of relying on the document opening.
 Prefer primary/official sources and cite source IDs or URLs explicitly.
 Be thorough: cover multiple angles, cite sources when possible, and distinguish facts from assumptions.
+If workspace tools are available, you have an isolated copy of the user's project. Use workspace_list/workspace_search/workspace_read to inspect relevant files before making codebase claims. Use workspace_write or workspace_edit only inside your own sandbox for notes, prototypes, patch drafts, or changed files. These writes do not modify the user's real workspace.
 Do not reference other models or participants.`;
 
 function formatProvidedEvidence(evidence: EvidenceEntry[]): string {
@@ -38,6 +40,31 @@ function dedupeEvidence(entries: EvidenceEntry[]): EvidenceEntry[] {
   return result;
 }
 
+function workspaceInstructions(workspace?: ParticipantWorkspaceContext): string {
+  if (!workspace) return "";
+  return `\n\n## Isolated Workspace Sandbox
+You have your own writable sandbox copy of the project.
+- Source workspace: ${workspace.sourceRoot}
+- Your sandbox root: ${workspace.sandbox.root}
+- Baseline files available: ${workspace.fileCount}
+- Skipped files/directories: ${workspace.skippedCount}
+
+Use these tools for project-sized tasks:
+- workspace_list: list copied project files
+- workspace_search: search copied project files
+- workspace_read: read a copied project file
+- workspace_write: write a file in your sandbox
+- workspace_edit: replace exact text in a sandbox file
+
+Do not claim that sandbox writes changed the real user workspace. In your final answer, mention any sandbox files you created or changed and why.`;
+}
+
+function workspaceToolNames(workspace?: ParticipantWorkspaceContext): string[] {
+  return workspace
+    ? ["workspace_list", "workspace_search", "workspace_read", "workspace_write", "workspace_edit"]
+    : [];
+}
+
 export class ParticipantRunner {
   private caller: ModelCaller;
   private resolver: FallbackResolver;
@@ -57,6 +84,7 @@ export class ParticipantRunner {
     slotIndex = 0,
     defaultFallbacks?: string[],
     onEvidence?: (entry: EvidenceEntry) => void,
+    workspace?: ParticipantWorkspaceContext,
   ): Promise<ParticipantOutput> {
     const resolver = defaultFallbacks
       ? new FallbackResolver(defaultFallbacks)
@@ -72,7 +100,8 @@ export class ParticipantRunner {
       collectedEvidence.push(entry);
       onEvidence?.(entry);
     };
-    const promptWithEvidence = `${prompt}${formatProvidedEvidence(evidence)}`;
+    const participantTools = [...tools, ...workspaceToolNames(workspace)];
+    const promptWithEvidence = `${prompt}${workspaceInstructions(workspace)}${formatProvidedEvidence(evidence)}`;
 
     for (let i = 0; i < allModels.length; i++) {
       const model = allModels[i];
@@ -80,8 +109,8 @@ export class ParticipantRunner {
         model,
         systemPrompt: FUSION_BASELINE_INSTRUCTIONS,
         messages: [{ role: "user", content: promptWithEvidence }],
-        tools: tools.length > 0 ? tools : undefined,
-        toolContext: { participantSlotIndex: slotIndex },
+        tools: participantTools.length > 0 ? participantTools : undefined,
+        toolContext: { participantSlotIndex: slotIndex, ...(workspace ? { workspace } : {}) },
         onEvidence: emitEvidence,
       };
 

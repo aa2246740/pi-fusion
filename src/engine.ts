@@ -11,7 +11,10 @@ import type {
   StructuredJudgeAnalysis,
   JudgeVerification,
   ObligationPlan,
+  WorkspaceRunSummary,
+  ParticipantWorkspaceSummary,
 } from "./types.js";
+import * as path from "node:path";
 import { ParticipantRunner } from "./participant.js";
 import { JudgeRunner } from "./judge.js";
 import { EvidenceCollector } from "./evidence.js";
@@ -26,6 +29,14 @@ import {
   normalizeRetryPolicy,
 } from "./retry.js";
 import type { WebBackend } from "./web.js";
+import {
+  buildChangeSet,
+  createWorkspaceBaseline,
+  createWorkspaceSandbox,
+  workspaceBaselineSha256,
+  type WorkspaceBaseline,
+  type WorkspaceSandbox,
+} from "./workspace-sandbox.js";
 
 export interface FusionRunOptions {
   /** If set to "skip", failed participants are automatically skipped instead of pausing */
@@ -40,6 +51,7 @@ export interface FusionEngineDependencies {
 
 export type FusionProgressPhase =
   | "preparing"
+  | "workspace"
   | "planning"
   | "evidence"
   | "participants"
@@ -60,6 +72,12 @@ export interface FusionProgressEvent {
 }
 
 const FUSION_QUORUM_ERROR = "Fusion quorum not met: fewer than 2 Participant Runs succeeded. Returning the only successful participant's raw answer (not a judged Fusion Result).";
+
+interface WorkspaceRunState {
+  baseline: WorkspaceBaseline;
+  summary: WorkspaceRunSummary;
+  sandboxes: WorkspaceSandbox[];
+}
 
 export class FusionEngine {
   private caller: ModelCaller;
@@ -93,6 +111,10 @@ export class FusionEngine {
     emitProgress({ phase: "preparing", state: "started", message: "Preparing tools and run context" });
     const toolNames = await this.prepareTools(config);
     emitProgress({ phase: "preparing", state: "completed", message: `Prepared tools: ${toolNames.length > 0 ? toolNames.join(", ") : "none"}` });
+
+    const workspaceRun = input.workspace?.enabled
+      ? await this.prepareWorkspaceRun(input, config.participants.length, emitProgress)
+      : undefined;
 
     // Phase 0: Build a prompt-derived obligation checklist. This is best-effort
     // and must use only the explicit user prompt, never benchmark rubrics or
@@ -161,7 +183,17 @@ export class FusionEngine {
         index,
         config.defaultFallbacks,
         (entry) => evidence.add(entry),
+        workspaceRun ? {
+          sandbox: workspaceRun.sandboxes[index],
+          sourceRoot: workspaceRun.summary.sourceRoot,
+          baselineSha256: workspaceRun.summary.baselineSha256,
+          fileCount: workspaceRun.summary.fileCount,
+          skippedCount: workspaceRun.summary.skippedCount,
+        } : undefined,
       );
+      if (workspaceRun) {
+        output.workspace = await this.summarizeParticipantWorkspace(workspaceRun.baseline, workspaceRun.sandboxes[index]);
+      }
       completedParticipants++;
       emitProgress({
         phase: "participants",
@@ -236,6 +268,7 @@ export class FusionEngine {
         participants: participantStatuses,
         evidence: evidence.getSummary(),
         evidencePool: evidence.getPool(),
+        workspace: workspaceRun?.summary,
         artifactsPath: "", // will be set by artifacts module
         mode: input.mode,
         totalCost: participantOutputs.reduce((sum, o) => sum + o.cost, 0),
@@ -312,6 +345,7 @@ export class FusionEngine {
       participants: participantStatuses,
       evidence: evidence.getSummary(),
       evidencePool: evidence.getPool(),
+      workspace: workspaceRun?.summary,
       artifactsPath: "", // will be set by artifacts module
       mode: input.mode,
       totalCost,
@@ -348,6 +382,85 @@ export class FusionEngine {
     }
 
     return tools;
+  }
+
+  private async prepareWorkspaceRun(
+    input: FusionInput,
+    participantCount: number,
+    emitProgress: (event: FusionProgressEvent) => void,
+  ): Promise<WorkspaceRunState> {
+    if (!input.workspace?.enabled) {
+      throw new Error("workspace input is not enabled");
+    }
+
+    const root = path.resolve(input.workspace.root);
+    const baselineRoot = path.join(root, "baseline");
+    emitProgress({ phase: "workspace", state: "started", message: "Copying workspace baseline into Pi Fusion sandbox" });
+    const baseline = await createWorkspaceBaseline({
+      sourceRoot: input.workspace.sourceRoot,
+      baselineRoot,
+    });
+    const baselineSha256 = workspaceBaselineSha256(baseline);
+    emitProgress({
+      phase: "workspace",
+      state: "progress",
+      message: `Workspace baseline ready (${baseline.manifest.files.length} files, ${baseline.manifest.skipped.length} skipped)`,
+    });
+
+    const sandboxes: WorkspaceSandbox[] = [];
+    for (let i = 0; i < participantCount; i++) {
+      sandboxes.push(await createWorkspaceSandbox({
+        baseline,
+        sandboxRoot: path.join(root, "participants", `p${i + 1}`),
+        sandboxId: `p${i + 1}`,
+      }));
+    }
+
+    const summary: WorkspaceRunSummary = {
+      enabled: true,
+      sourceRoot: baseline.sourceRoot,
+      root,
+      baselineSha256,
+      fileCount: baseline.manifest.files.length,
+      skippedCount: baseline.manifest.skipped.length,
+      participantCount,
+    };
+    emitProgress({ phase: "workspace", state: "completed", message: `Created ${participantCount} participant workspaces` });
+    return { baseline, summary, sandboxes };
+  }
+
+  private async summarizeParticipantWorkspace(
+    baseline: WorkspaceBaseline,
+    sandbox: WorkspaceSandbox,
+  ): Promise<ParticipantWorkspaceSummary> {
+    try {
+      const changeSet = await buildChangeSet({ baseline, sandbox });
+      return {
+        sandboxId: sandbox.sandboxId,
+        root: sandbox.root,
+        sourceRoot: baseline.sourceRoot,
+        baselineSha256: workspaceBaselineSha256(baseline),
+        fileCount: baseline.manifest.files.length,
+        skippedCount: baseline.manifest.skipped.length,
+        changedFiles: changeSet.operations.map((operation) => ({
+          op: operation.op,
+          path: operation.path,
+          ...("size" in operation ? { size: operation.size } : {}),
+        })),
+        changeSet,
+      };
+    } catch (error) {
+      return {
+        sandboxId: sandbox.sandboxId,
+        root: sandbox.root,
+        sourceRoot: baseline.sourceRoot,
+        baselineSha256: workspaceBaselineSha256(baseline),
+        fileCount: baseline.manifest.files.length,
+        skippedCount: baseline.manifest.skipped.length,
+        changedFiles: [],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }
 

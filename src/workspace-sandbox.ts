@@ -12,10 +12,32 @@ const DEFAULT_EXCLUDED_NAMES = new Set([
   "node_modules",
   ".auto",
   ".ds_store",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".turbo",
+  ".cache",
+  ".vite",
+  ".parcel-cache",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  ".gradle",
+  ".venv",
+  "__pycache__",
+  "venv",
+  "coverage",
+  "dist",
+  "build",
+  "out",
+  "target",
+  "deriveddata",
 ]);
 
 const SECRET_FILE_RE = /(^|\/)(\.env(?:\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|.*\.pem|.*\.key|.*token.*|.*secret.*|.*credentials.*)$/i;
 const DEFAULT_MAX_FILE_BYTES = 1_000_000;
+const DEFAULT_MAX_WORKSPACE_FILES = 5_000;
+const DEFAULT_MAX_WORKSPACE_BYTES = 50_000_000;
 const DEFAULT_MAX_CHANGESET_OPERATIONS = 200;
 const DEFAULT_MAX_CHANGESET_BYTES = 5_000_000;
 const NOFOLLOW = fsConstants.O_NOFOLLOW ?? 0;
@@ -26,6 +48,8 @@ export interface WorkspacePolicy {
   excludedNames: ReadonlySet<string>;
   secretFilePattern: RegExp;
   maxFileBytes: number;
+  maxWorkspaceFiles: number;
+  maxWorkspaceBytes: number;
   maxChangeSetOperations: number;
   maxChangeSetBytes: number;
 }
@@ -34,6 +58,8 @@ export const DEFAULT_WORKSPACE_POLICY: WorkspacePolicy = {
   excludedNames: DEFAULT_EXCLUDED_NAMES,
   secretFilePattern: SECRET_FILE_RE,
   maxFileBytes: DEFAULT_MAX_FILE_BYTES,
+  maxWorkspaceFiles: DEFAULT_MAX_WORKSPACE_FILES,
+  maxWorkspaceBytes: DEFAULT_MAX_WORKSPACE_BYTES,
   maxChangeSetOperations: DEFAULT_MAX_CHANGESET_OPERATIONS,
   maxChangeSetBytes: DEFAULT_MAX_CHANGESET_BYTES,
 };
@@ -224,6 +250,41 @@ async function ensureNoSymlinkPath(root: string, relativePath: string, options: 
   return current;
 }
 
+async function ensureNoSymlinkParentDirectory(root: string, relativePath: string): Promise<string> {
+  const safeRel = normalizeRelativePath(relativePath);
+  const rootReal = await fs.realpath(root);
+  const parentRel = path.posix.dirname(safeRel);
+  if (parentRel === ".") return path.join(rootReal, safeRel);
+
+  const parts = parentRel.split("/").filter(Boolean);
+  let current = rootReal;
+  for (const part of parts) {
+    current = path.join(current, part);
+    try {
+      const stat = await fs.lstat(current);
+      if (stat.isSymbolicLink()) {
+        throw new WorkspaceSandboxError(`refusing symlink inside sandbox: ${safeRel}`);
+      }
+      if (!stat.isDirectory()) {
+        throw new WorkspaceSandboxError(`unsafe path component is not a directory: ${safeRel}`);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      await fs.mkdir(current);
+      const created = await fs.lstat(current);
+      if (created.isSymbolicLink() || !created.isDirectory()) {
+        throw new WorkspaceSandboxError(`unsafe created path component: ${safeRel}`);
+      }
+    }
+  }
+
+  const parentReal = await fs.realpath(current);
+  if (parentReal !== rootReal && !parentReal.startsWith(`${rootReal}${path.sep}`)) {
+    throw new WorkspaceSandboxError(`unsafe path outside sandbox: ${safeRel}`);
+  }
+  return path.join(rootReal, ...safeRel.split("/"));
+}
+
 async function copyRegularFile(sourcePath: string, destPath: string, mode: number): Promise<void> {
   await fs.mkdir(path.dirname(destPath), { recursive: true });
   await fs.copyFile(sourcePath, destPath, fsConstants.COPYFILE_EXCL);
@@ -234,7 +295,11 @@ async function walkSource(
   sourceRoot: string,
   relativeDir: string,
   visitor: (relativePath: string, absolutePath: string, stat: Awaited<ReturnType<typeof fs.lstat>>) => Promise<void>,
-  options: { policy?: WorkspacePolicy; policyViolation?: "skip" | "reject" } = {},
+  options: {
+    policy?: WorkspacePolicy;
+    policyViolation?: "skip" | "reject";
+    onPolicySkip?: (relativePath: string, reason: string) => void;
+  } = {},
 ): Promise<void> {
   const policy = options.policy ?? DEFAULT_WORKSPACE_POLICY;
   const policyViolation = options.policyViolation ?? "skip";
@@ -248,6 +313,7 @@ async function walkSource(
       if (policyViolation === "reject") {
         throw new WorkspaceSandboxError(`workspace policy forbids ${relativePath}: ${violation}`);
       }
+      options.onPolicySkip?.(relativePath, violation);
       continue;
     }
     const absolutePath = path.join(dir, entry.name);
@@ -274,6 +340,7 @@ export async function createWorkspaceBaseline(options: {
 
   const files: WorkspaceManifestFile[] = [];
   const skipped: WorkspaceBaselineManifest["skipped"] = [];
+  let copiedBytes = 0;
 
   await walkSource(sourceRoot, "", async (relativePath, absolutePath, stat) => {
     if (stat.isDirectory()) {
@@ -292,15 +359,24 @@ export async function createWorkspaceBaseline(options: {
       skipped.push({ path: relativePath, reason: "hardlink" });
       return;
     }
-    if (stat.size > maxFileBytes) {
+    const size = Number(stat.size);
+    if (size > maxFileBytes) {
       skipped.push({ path: relativePath, reason: "too-large" });
+      return;
+    }
+    if (files.length >= policy.maxWorkspaceFiles) {
+      skipped.push({ path: relativePath, reason: "workspace-file-limit" });
+      return;
+    }
+    if (copiedBytes + size > policy.maxWorkspaceBytes) {
+      skipped.push({ path: relativePath, reason: "workspace-byte-limit" });
       return;
     }
 
     const mode = Number(stat.mode) & 0o777;
-    const size = Number(stat.size);
     const destPath = toFsPath(baselineRoot, relativePath);
     await copyRegularFile(absolutePath, destPath, mode);
+    copiedBytes += size;
     files.push({
       path: relativePath,
       type: "file",
@@ -308,7 +384,13 @@ export async function createWorkspaceBaseline(options: {
       size,
       mode,
     });
-  }, { policy, policyViolation: "skip" });
+  }, {
+    policy,
+    policyViolation: "skip",
+    onPolicySkip: (relativePath, reason) => {
+      skipped.push({ path: relativePath, reason });
+    },
+  });
 
   files.sort((a, b) => a.path.localeCompare(b.path));
   const git = await gitInfo(sourceRoot);
@@ -353,7 +435,11 @@ export async function readSandboxFile(sandbox: WorkspaceSandbox, userPath: strin
 
 export async function writeSandboxFile(sandbox: WorkspaceSandbox, userPath: string, content: string): Promise<void> {
   const safeRel = normalizeRelativePath(userPath);
-  const filePath = await ensureNoSymlinkPath(sandbox.root, safeRel, { allowMissingLeaf: true });
+  const size = Buffer.byteLength(content, "utf-8");
+  if (size > DEFAULT_WORKSPACE_POLICY.maxFileBytes) {
+    throw new WorkspaceSandboxError(`file exceeds byte limit for ${safeRel}`);
+  }
+  const filePath = await ensureNoSymlinkParentDirectory(sandbox.root, safeRel);
   try {
     const stat = await fs.lstat(filePath);
     if (stat.isSymbolicLink()) throw new WorkspaceSandboxError(`refusing symlink inside sandbox: ${safeRel}`);
@@ -361,7 +447,6 @@ export async function writeSandboxFile(sandbox: WorkspaceSandbox, userPath: stri
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, content, "utf-8");
 }
 

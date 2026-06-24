@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
+  DEFAULT_WORKSPACE_POLICY,
   applyChangeSetToWorkspace,
   buildChangeSet,
   createWorkspaceBaseline,
@@ -144,6 +145,22 @@ describe("workspace sandbox safety contracts", () => {
     await expect(fs.access(path.join(sourceRoot, "src", "index.ts"))).resolves.toBeUndefined();
   });
 
+  it("writes new files inside new sandbox-only directories", async () => {
+    const root = await tempDir("pi-fusion-nested-write");
+    const sourceRoot = path.join(root, "source");
+    await writeFile(path.join(sourceRoot, "README.md"), "safe");
+
+    const baseline = await createWorkspaceBaseline({ sourceRoot, baselineRoot: path.join(root, "baseline") });
+    const sandbox = await createWorkspaceSandbox({ baseline, sandboxRoot: path.join(root, "sandbox"), sandboxId: "p1" });
+
+    await writeSandboxFile(sandbox, "notes/findings.md", "sandbox notes");
+
+    await expect(readSandboxFile(sandbox, "notes/findings.md")).resolves.toBe("sandbox notes");
+    await expect(fs.access(path.join(sourceRoot, "notes", "findings.md"))).rejects.toThrow();
+    const changeSet = await buildChangeSet({ baseline, sandbox });
+    expect(changeSet.operations.map((op) => `${op.op}:${op.path}`)).toEqual(["add:notes/findings.md"]);
+  });
+
   it("requires exact unique edit matches", async () => {
     const root = await tempDir("pi-fusion-exact-edit");
     const sourceRoot = path.join(root, "source");
@@ -171,6 +188,60 @@ describe("workspace sandbox safety contracts", () => {
     expect(baseline.manifest.files.map((file) => file.path)).toContain("normal.txt");
     expect(baseline.manifest.files.map((file) => file.path)).not.toContain("linked-secret.txt");
     await expect(fs.access(path.join(baseline.root, "linked-secret.txt"))).rejects.toThrow();
+  });
+
+  it("skips common generated and cache directories when creating a baseline", async () => {
+    const root = await tempDir("pi-fusion-generated-skip");
+    const sourceRoot = path.join(root, "source");
+    await writeFile(path.join(sourceRoot, "src", "app.ts"), "export const app = true;\n");
+    await writeFile(path.join(sourceRoot, ".next", "server.js"), "generated");
+    await writeFile(path.join(sourceRoot, ".turbo", "cache.bin"), "generated");
+    await writeFile(path.join(sourceRoot, "dist", "bundle.js"), "generated");
+    await writeFile(path.join(sourceRoot, "coverage", "report.txt"), "generated");
+
+    const baseline = await createWorkspaceBaseline({ sourceRoot, baselineRoot: path.join(root, "baseline") });
+
+    expect(baseline.manifest.files.map((file) => file.path)).toEqual(["src/app.ts"]);
+    expect(baseline.manifest.skipped).toEqual(expect.arrayContaining([
+      { path: ".next", reason: "excluded path segment: .next" },
+      { path: ".turbo", reason: "excluded path segment: .turbo" },
+      { path: "coverage", reason: "excluded path segment: coverage" },
+      { path: "dist", reason: "excluded path segment: dist" },
+    ]));
+    await expect(fs.access(path.join(baseline.root, "dist", "bundle.js"))).rejects.toThrow();
+  });
+
+  it("caps baseline file count before copying an oversized project into participant sandboxes", async () => {
+    const root = await tempDir("pi-fusion-baseline-limit");
+    const sourceRoot = path.join(root, "source");
+    await writeFile(path.join(sourceRoot, "a.txt"), "a");
+    await writeFile(path.join(sourceRoot, "b.txt"), "b");
+
+    const baseline = await createWorkspaceBaseline({
+      sourceRoot,
+      baselineRoot: path.join(root, "baseline"),
+      policy: {
+        ...DEFAULT_WORKSPACE_POLICY,
+        maxWorkspaceFiles: 1,
+      },
+    });
+
+    expect(baseline.manifest.files.map((file) => file.path)).toEqual(["a.txt"]);
+    expect(baseline.manifest.skipped).toContainEqual({ path: "b.txt", reason: "workspace-file-limit" });
+  });
+
+  it("rejects sandbox writes that exceed the per-file byte limit", async () => {
+    const root = await tempDir("pi-fusion-write-limit");
+    const sourceRoot = path.join(root, "source");
+    await writeFile(path.join(sourceRoot, "README.md"), "safe");
+
+    const baseline = await createWorkspaceBaseline({ sourceRoot, baselineRoot: path.join(root, "baseline") });
+    const sandbox = await createWorkspaceSandbox({ baseline, sandboxRoot: path.join(root, "sandbox"), sandboxId: "p1" });
+
+    await expect(writeSandboxFile(sandbox, "huge.txt", "x".repeat(DEFAULT_WORKSPACE_POLICY.maxFileBytes + 1))).rejects.toThrow(
+      /byte limit/i,
+    );
+    await expect(fs.access(path.join(sandbox.root, "huge.txt"))).rejects.toThrow();
   });
 
   it("rejects conflicting ChangeSet operations before touching the workspace", async () => {

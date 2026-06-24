@@ -31,7 +31,15 @@ import {
 import { DEFAULT_MODEL_RETRY_POLICY } from "./src/retry.js";
 import { formatSandboxBashResult, runSandboxedBash } from "./src/bash.js";
 import { extractFocusedExcerpt } from "./src/text-excerpt.js";
-import { extractLocalFileReferences, importExternalEvidence } from "./src/workspace-sandbox.js";
+import {
+  editSandboxFile,
+  extractLocalFileReferences,
+  importExternalEvidence,
+  listSandboxFiles,
+  readSandboxFile,
+  searchSandboxFiles,
+  writeSandboxFile,
+} from "./src/workspace-sandbox.js";
 
 function getConfigDir(): string {
   return path.join(os.homedir(), ".pi", "agent", "pi-fusion");
@@ -40,6 +48,10 @@ function getConfigDir(): string {
 function getArtifactsDir(): string {
   // ArtifactWriter appends runs/<run-id>; pass the Pi Fusion base directory.
   return getConfigDir();
+}
+
+function getWorkspaceRunsDir(): string {
+  return path.join(getConfigDir(), "workspace-runs");
 }
 
 function splitModelRef(modelRef: string): { provider: string; id: string } {
@@ -240,6 +252,62 @@ async function buildToolDefinitions(toolNames: string[], webBackend?: WebBackend
     });
   }
 
+  if (toolNames.includes("workspace_list")) {
+    tools.push({
+      name: "workspace_list",
+      description: "List files in your isolated participant workspace copy. This never reads the user's real workspace directly.",
+      parameters: Type.Object({
+        prefix: Type.Optional(Type.String({ description: "Optional path prefix to filter files, e.g. src/ or docs/." })),
+        maxResults: Type.Optional(Type.Number({ description: "Maximum files to return, capped at 500." })),
+      }),
+    });
+  }
+
+  if (toolNames.includes("workspace_search")) {
+    tools.push({
+      name: "workspace_search",
+      description: "Search text files in your isolated participant workspace copy.",
+      parameters: Type.Object({
+        query: Type.String({ description: "Case-insensitive literal text query." }),
+        maxResults: Type.Optional(Type.Number({ description: "Maximum matches to return, capped at 50." })),
+      }),
+    });
+  }
+
+  if (toolNames.includes("workspace_read")) {
+    tools.push({
+      name: "workspace_read",
+      description: "Read one file from your isolated participant workspace copy using a relative path.",
+      parameters: Type.Object({
+        path: Type.String({ description: "Relative file path inside your participant workspace." }),
+        maxChars: Type.Optional(Type.Number({ description: "Maximum characters to return, capped at 50000." })),
+      }),
+    });
+  }
+
+  if (toolNames.includes("workspace_write")) {
+    tools.push({
+      name: "workspace_write",
+      description: "Write one UTF-8 text file inside your isolated participant workspace. This does not modify the user's real workspace.",
+      parameters: Type.Object({
+        path: Type.String({ description: "Relative file path inside your participant workspace." }),
+        content: Type.String({ description: "UTF-8 file content to write." }),
+      }),
+    });
+  }
+
+  if (toolNames.includes("workspace_edit")) {
+    tools.push({
+      name: "workspace_edit",
+      description: "Replace exact text in one file inside your isolated participant workspace. This does not modify the user's real workspace.",
+      parameters: Type.Object({
+        path: Type.String({ description: "Relative file path inside your participant workspace." }),
+        oldText: Type.String({ description: "Exact existing text to replace. Must occur exactly once." }),
+        newText: Type.String({ description: "Replacement text." }),
+      }),
+    });
+  }
+
   return tools.length > 0 ? tools : undefined;
 }
 
@@ -286,6 +354,68 @@ async function executeTool(
         fetchedAt: Date.now(),
       };
       return { content: `[${id}]\n${content}`, isError: result.exitCode !== 0, evidence: [entry] };
+    }
+
+    if (toolName.startsWith("workspace_")) {
+      const workspace = request.toolContext?.workspace;
+      if (!workspace) {
+        return { content: `${toolName} is available only to participant runs with a workspace sandbox.`, isError: true, evidence: [] };
+      }
+
+      if (toolName === "workspace_list") {
+        const prefix = typeof args.prefix === "string" ? args.prefix.trim().replace(/\\/g, "/") : "";
+        const maxResults = Math.max(1, Math.min(500, typeof args.maxResults === "number" ? Math.floor(args.maxResults) : 200));
+        const allFiles = await listSandboxFiles(workspace.sandbox);
+        const files = prefix ? allFiles.filter((file) => file.startsWith(prefix)) : allFiles;
+        const shown = files.slice(0, maxResults);
+        return {
+          content: [
+            `Workspace: ${workspace.sandbox.sandboxId}`,
+            `Files: ${files.length}${files.length > shown.length ? ` (showing ${shown.length})` : ""}`,
+            ...shown.map((file) => `- ${file}`),
+          ].join("\n"),
+          isError: false,
+          evidence: [],
+        };
+      }
+
+      if (toolName === "workspace_search") {
+        const query = typeof args.query === "string" ? args.query : "";
+        const maxResults = Math.max(1, Math.min(50, typeof args.maxResults === "number" ? Math.floor(args.maxResults) : 20));
+        const results = await searchSandboxFiles(workspace.sandbox, query, { maxResults });
+        return {
+          content: results.length === 0
+            ? `No matches for ${JSON.stringify(query)}.`
+            : results.map((result) => `${result.path}:${result.line}: ${result.preview}`).join("\n"),
+          isError: false,
+          evidence: [],
+        };
+      }
+
+      if (toolName === "workspace_read") {
+        const filePath = typeof args.path === "string" ? args.path : "";
+        const maxChars = Math.max(1, Math.min(50_000, typeof args.maxChars === "number" ? Math.floor(args.maxChars) : 30_000));
+        const content = await readSandboxFile(workspace.sandbox, filePath);
+        const clipped = content.length > maxChars
+          ? `${content.slice(0, maxChars)}\n[truncated at ${maxChars} chars from ${content.length}]`
+          : content;
+        return { content: clipped, isError: false, evidence: [] };
+      }
+
+      if (toolName === "workspace_write") {
+        const filePath = typeof args.path === "string" ? args.path : "";
+        const content = typeof args.content === "string" ? args.content : "";
+        await writeSandboxFile(workspace.sandbox, filePath, content);
+        return { content: `Wrote ${filePath} in ${workspace.sandbox.sandboxId}.`, isError: false, evidence: [] };
+      }
+
+      if (toolName === "workspace_edit") {
+        const filePath = typeof args.path === "string" ? args.path : "";
+        const oldText = typeof args.oldText === "string" ? args.oldText : "";
+        const newText = typeof args.newText === "string" ? args.newText : "";
+        await editSandboxFile(workspace.sandbox, filePath, oldText, newText);
+        return { content: `Edited ${filePath} in ${workspace.sandbox.sandboxId}.`, isError: false, evidence: [] };
+      }
     }
 
     if ((toolName === "web_search" || toolName === "web_fetch") && !webBackend) {
@@ -617,6 +747,11 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
+      const workspaceRoot = path.join(
+        getWorkspaceRunsDir(),
+        `${Date.now()}-${stableHash(`${ctx.cwd}:${prompt}`)}`,
+      );
+
       const preview = [
         `Pi Fusion Run Preview`,
         ``,
@@ -626,6 +761,9 @@ export default function (pi: ExtensionAPI) {
         `Web policy: ${config.webPolicy}`,
         `Evidence backend: ${webBackendLabel}`,
         `Local evidence: ${localEvidence.evidence.length > 0 ? `${localEvidence.evidence.length} file(s) imported read-only` : "none"}`,
+        `Workspace sandbox: on`,
+        `Workspace source: ${ctx.cwd}`,
+        `Workspace copies: one isolated writable sandbox per participant`,
         `Bash tool: ${(config.toolPolicy?.bash ?? "sandboxed") === "sandboxed" ? "sandboxed" : "off"}`,
         `Retries: ${(config.retryPolicy ?? DEFAULT_MODEL_RETRY_POLICY).maxRetries} per model before fallback`,
         `Monitor: ${monitor ? "on" : "off"}`,
@@ -659,7 +797,17 @@ export default function (pi: ExtensionAPI) {
         const engine = new FusionEngine(caller, { webBackend });
         result = await engine.run(
           config,
-          { prompt, mode, monitor, initialEvidence: localEvidence.evidence },
+          {
+            prompt,
+            mode,
+            monitor,
+            initialEvidence: localEvidence.evidence,
+            workspace: {
+              enabled: true,
+              sourceRoot: ctx.cwd,
+              root: workspaceRoot,
+            },
+          },
           { onProgress: progress.onProgress },
         );
       } catch (error) {
@@ -739,6 +887,14 @@ export default function (pi: ExtensionAPI) {
       lines.push(`## Participants`);
       for (const p of result.participants) lines.push(formatParticipantLine(p));
 
+      if (result.workspace) {
+        lines.push("");
+        lines.push(`## Workspace Sandboxes`);
+        lines.push(`Source: ${result.workspace.sourceRoot}`);
+        lines.push(`Sandbox root: ${result.workspace.root}`);
+        lines.push(`Baseline files: ${result.workspace.fileCount} copied, ${result.workspace.skippedCount} skipped`);
+      }
+
       lines.push("");
       lines.push(`## Evidence`);
       lines.push(`Sources: ${result.evidence.totalEntries}`);
@@ -751,6 +907,7 @@ export default function (pi: ExtensionAPI) {
       lines.push("");
       lines.push(`## Artifacts`);
       lines.push(`- Run directory: ${result.artifactsPath}`);
+      if (result.workspace) lines.push(`- Workspace sandboxes: ${result.workspace.root}`);
 
       lines.push("");
       lines.push(`---`);

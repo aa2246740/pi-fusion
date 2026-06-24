@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { FusionResult, ParticipantStatus } from "./types.js";
+import type { FusionResult, ParticipantStatus, ParticipantWorkspaceSummary } from "./types.js";
 
 function generateRunId(): string {
   const now = new Date();
@@ -13,6 +13,19 @@ function formatParticipant(p: ParticipantStatus): string {
   switch (p.state) {
     case "success": {
       const o = p.output;
+      const workspaceLines = o.workspace
+        ? [
+          ``,
+          `## Workspace Sandbox`,
+          ``,
+          `Sandbox: ${o.workspace.sandboxId}`,
+          `Root: ${o.workspace.root}`,
+          `Baseline files: ${o.workspace.fileCount}`,
+          `Skipped files: ${o.workspace.skippedCount}`,
+          o.workspace.error ? `Workspace summary error: ${o.workspace.error}` : `Changed files: ${o.workspace.changedFiles.length}`,
+          ...o.workspace.changedFiles.map((file) => `- ${file.op} ${file.path}${file.size !== undefined ? ` (${file.size} bytes)` : ""}`),
+        ]
+        : [];
       return [
         `# Participant ${p.slotIndex + 1} — ${o.model}`,
         ``,
@@ -24,6 +37,7 @@ function formatParticipant(p: ParticipantStatus): string {
         `## Answer`,
         ``,
         o.answer,
+        ...workspaceLines,
       ].filter(Boolean).join("\n");
     }
     case "failed":
@@ -52,6 +66,11 @@ function formatParticipant(p: ParticipantStatus): string {
     default:
       return `# Participant ${(p as any).slotIndex + 1}\n\nStatus: ${(p as any).state}`;
   }
+}
+
+function summarizeWorkspace(summary: ParticipantWorkspaceSummary): Omit<ParticipantWorkspaceSummary, "changeSet"> {
+  const { changeSet: _changeSet, ...rest } = summary;
+  return rest;
 }
 
 export class ArtifactWriter {
@@ -98,11 +117,37 @@ export class ArtifactWriter {
     }
 
     // Participants
+    const workspaceSummaries: Array<Omit<ParticipantWorkspaceSummary, "changeSet">> = [];
     for (const p of result.participants) {
       const index = "slotIndex" in p ? (p as any).slotIndex : 0;
       await fs.writeFile(
         path.join(runDir, `participant-${index + 1}.md`),
         formatParticipant(p),
+        "utf-8",
+      );
+      if (p.state === "success" && p.output.workspace) {
+        workspaceSummaries.push(summarizeWorkspace(p.output.workspace));
+        if (p.output.workspace.changeSet) {
+          await fs.writeFile(
+            path.join(runDir, `participant-${index + 1}-changeset.json`),
+            JSON.stringify(p.output.workspace.changeSet, null, 2),
+            "utf-8",
+          );
+        }
+      }
+    }
+
+    if (result.workspace || workspaceSummaries.length > 0) {
+      await fs.writeFile(
+        path.join(runDir, "participant-sandboxes.json"),
+        JSON.stringify(
+          {
+            workspace: result.workspace,
+            participants: workspaceSummaries,
+          },
+          null,
+          2,
+        ),
         "utf-8",
       );
     }
@@ -137,6 +182,12 @@ export class ArtifactWriter {
           totalCost: result.totalCost,
           totalTokens: result.totalTokens,
           obligationCount: result.obligationPlan?.obligations.length ?? 0,
+          workspaceEnabled: Boolean(result.workspace?.enabled),
+          workspaceSourceRoot: result.workspace?.sourceRoot,
+          workspaceRoot: result.workspace?.root,
+          workspaceChangedFileCount: result.participants
+            .filter((p) => p.state === "success")
+            .reduce((sum, p) => sum + (p.output.workspace?.changedFiles.length ?? 0), 0),
           hasJudgeRecoveryNotes: Boolean(result.judgeRecoveryNotes),
           participantCount: result.participants.length,
           successfulCount: result.participants.filter((p) => p.state === "success").length,

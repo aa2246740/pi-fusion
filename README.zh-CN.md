@@ -19,6 +19,7 @@ Pi Fusion 为一个模型答案不够用的任务提供通用 fusion layer：
 - 可选 verification/revision loop
 - 可选 web/evidence tools
 - 用于确定性计算的 sandboxed bash
+- 每个 participant 独立的 workspace sandbox 和读写工具
 - model fallback 和 retry policy
 - artifacts、evidence summaries、token usage 和 cost reporting
 - Pi 原生命令和配置
@@ -162,6 +163,12 @@ Pi Fusion 可以解析带有 `content`、`text` 或 `markdown` 的常见 fetch s
 
 你可以在 MCP interface 后面使用 private MCP servers、company search、本地 crawlers 或 hosted search APIs。Provider-specific backend，例如 `unified-search`，应该被看作可选兼容实现，而不是 Pi Fusion 核心依赖。
 
+## Workspace sandboxes
+
+面对大型项目任务时，Pi Fusion 会把当前 Pi working directory 复制成一个 Pi Fusion 管理的 baseline，并为每个 Participant Model 创建一个独立可写 sandbox。Participant 只能通过 scoped `workspace_*` tools 在自己的 sandbox 中 list、search、read、write、edit 文件。
+
+Sandbox 写入不会修改真实用户 workspace。运行结束后，Pi Fusion 会把每个 participant 的 sandbox root、变更文件列表和 ChangeSet artifacts 写到 run directory，方便 judge 和用户审查具体文件级工作，而不是只看纯文字回答。
+
 ## DRACO benchmark
 
 Pi Fusion exceeds the Fusion API budget baseline on the DRACO 10-case benchmark。
@@ -190,7 +197,9 @@ npm test
 
 ## 安全
 
-Pi extensions 会以你的本地权限运行。安装第三方 package 前请先审查源码。Pi Fusion 的 bash tool 是 sandboxed，面向确定性计算，而不是 arbitrary host access。
+Pi extensions 会以你的本地权限运行。安装第三方 package 前请先审查源码。Pi 本身不提供进程内安全 sandbox。Pi Fusion 因此把 workspace sandbox 当作产品层隔离：文件先复制到 participant 独立目录，participant 写入只留在那里，把 ChangeSet 应用回真实 workspace 是独立于 Fusion Run 的步骤。
+
+Pi Fusion 的 bash tool 是 sandboxed，面向确定性计算，而不是 arbitrary host access。
 
 ## License
 

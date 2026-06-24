@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import { FusionEngine } from "../src/engine.js";
+import { writeSandboxFile } from "../src/workspace-sandbox.js";
 import type {
   ModelCaller,
   GlobalFusionConfig,
@@ -82,6 +86,68 @@ async function waitFor(predicate: () => boolean): Promise<void> {
 }
 
 describe("FusionEngine", () => {
+  it("creates isolated writable workspace sandboxes for participants", async () => {
+    const sourceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pi-fusion-source-"));
+    const sandboxRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pi-fusion-workspaces-"));
+    await fs.mkdir(path.join(sourceRoot, "src"), { recursive: true });
+    await fs.writeFile(path.join(sourceRoot, "src", "app.ts"), "export const value = 1;\n", "utf-8");
+
+    const seen: Array<{ slotIndex: number; tools?: string[]; root?: string }> = [];
+    const caller: ModelCaller = {
+      async call(request) {
+        const isParticipant = !request.systemPrompt.includes("[PHASE:");
+        if (isParticipant) {
+          const workspace = request.toolContext?.workspace;
+          const slotIndex = request.toolContext?.participantSlotIndex ?? -1;
+          seen.push({ slotIndex, tools: request.tools, root: workspace?.sandbox.root });
+          expect(workspace).toBeDefined();
+          await writeSandboxFile(workspace!.sandbox, `notes/p${slotIndex + 1}.md`, `participant ${slotIndex + 1} notes`);
+          return {
+            answer: `participant ${slotIndex + 1} used workspace`,
+            model: request.model,
+            tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+            cost: 0,
+          };
+        }
+
+        return {
+          answer: request.systemPrompt.includes("[PHASE: ANALYSIS]") ? JSON.stringify(ANALYSIS) : "final",
+          model: request.model,
+          tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+          cost: 0,
+        };
+      },
+    };
+
+    try {
+      const engine = new FusionEngine(caller);
+      const result = await engine.run(makeConfig(), {
+        prompt: "Inspect this project and propose changes",
+        mode: "fast",
+        monitor: false,
+        workspace: { enabled: true, sourceRoot, root: sandboxRoot },
+      });
+
+      expect(seen).toHaveLength(2);
+      expect(seen.every((entry) => entry.tools?.includes("workspace_read"))).toBe(true);
+      expect(seen.every((entry) => entry.tools?.includes("workspace_write"))).toBe(true);
+      expect(new Set(seen.map((entry) => entry.root)).size).toBe(2);
+      await expect(fs.access(path.join(sourceRoot, "notes", "p1.md"))).rejects.toThrow();
+
+      const successful = result.participants.filter((p) => p.state === "success");
+      expect(successful).toHaveLength(2);
+      for (const status of successful) {
+        expect(status.output.workspace?.changedFiles).toEqual([
+          expect.objectContaining({ op: "add", path: `notes/p${status.slotIndex + 1}.md` }),
+        ]);
+      }
+      expect(result.workspace?.participantCount).toBe(2);
+    } finally {
+      await fs.rm(sourceRoot, { recursive: true, force: true });
+      await fs.rm(sandboxRoot, { recursive: true, force: true });
+    }
+  });
+
   it("emits progress events before long participant calls finish", async () => {
     const events: Array<{ phase: string; state: string; slotIndex?: number; completedParticipants?: number }> = [];
     const pendingParticipants = new Map<string, ReturnType<typeof deferred<ModelCallResult>>>();

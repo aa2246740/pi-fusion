@@ -1,6 +1,6 @@
 {
   "name": "@aa2246740/pi-fusion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Model fusion for Pi agents",
   "type": "module",
   "license": "MIT",

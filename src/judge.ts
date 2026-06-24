@@ -39,6 +39,21 @@ function formatEvidenceLine(e: EvidencePool["entries"][number]): string {
   return `- [${e.id}] ${label}:\n${evidenceBody(e)}`;
 }
 
+function formatParticipantForJudge(p: ParticipantOutput): string {
+  const workspace = p.workspace
+    ? [
+      "",
+      "#### Workspace Sandbox",
+      `Sandbox: ${p.workspace.sandboxId}`,
+      `Changed files: ${p.workspace.changedFiles.length}`,
+      ...p.workspace.changedFiles.slice(0, 80).map((file) => `- ${file.op} ${file.path}${file.size !== undefined ? ` (${file.size} bytes)` : ""}`),
+      p.workspace.changedFiles.length > 80 ? `- [truncated ${p.workspace.changedFiles.length - 80} additional file changes]` : "",
+      p.workspace.error ? `Workspace summary error: ${p.workspace.error}` : "",
+    ].filter(Boolean).join("\n")
+    : "";
+  return `### Participant ${p.slotIndex + 1} (${p.model})\n${p.answer}${workspace ? `\n\n${workspace}` : ""}`;
+}
+
 const PRODUCT_PROCUREMENT_SOURCE_GUIDANCE = "For product/procurement/vendor comparisons, keep configuration options, expandability, regional warranty/support terms, application/workload requirements, independent thermal/performance/serviceability evidence, lifecycle/TCO inputs, and current price/availability source-bound to official vendor/application docs, service terms, credible reviews, or market listings. Distinguish official specs from assumptions; include source IDs or URLs; do not invent missing values.";
 const PRODUCT_PROCUREMENT_ANSWER_STRUCTURE = "When answering a side-by-side product/procurement comparison, prefer a compact matrix that maps each user-requested criterion to each option, with source IDs/URLs, confidence/assumption notes, lifecycle or support implications, and a final recommendation with verification actions for any missing decision-critical value.";
 const PERSONAL_FINANCE_SOURCE_GUIDANCE = "For personal-finance, tax-planning, retirement, education-funding, insurance, or household cash-flow questions, keep account rules and limits, eligibility, contribution and withdrawal tax consequences, benefit/grant formulas, marginal-tax assumptions, debt/cash-flow constraints, insurance risks, time horizons, and jurisdiction/current-year context source-bound to official tax, regulator, plan-provider, or government sources. Use bash for explicit arithmetic from stated inputs. Cite source IDs or URLs and do not invent current-year numbers.";
@@ -103,7 +118,7 @@ export class JudgeRunner {
     evidence: EvidencePool,
   ): Promise<StructuredJudgeAnalysis> {
     const participantSummaries = participants
-      .map((p) => `### Participant ${p.slotIndex + 1} (${p.model})\n${p.answer}`)
+      .map(formatParticipantForJudge)
       .join("\n\n");
 
     const evidenceText = evidence.entries.length > 0
@@ -147,7 +162,7 @@ Return ONLY valid JSON, no markdown fencing.`,
     if (!this.obligationText.trim()) return "";
 
     const participantSummaries = participants
-      .map((p) => `### Participant ${p.slotIndex + 1} (${p.model})\n${p.answer}`)
+      .map(formatParticipantForJudge)
       .join("\n\n");
     const evidenceText = evidence.entries.length > 0
       ? "\n\n## Existing Evidence\n" + evidence.entries.map(formatEvidenceLine).join("\n")
@@ -190,7 +205,7 @@ Return concise markdown notes. Include a compact evidence ledger for source-heav
     recoveryNotes = "",
   ): Promise<string> {
     const participantSummaries = participants
-      .map((p) => `### Participant ${p.slotIndex + 1} (${p.model})\n${p.answer}`)
+      .map(formatParticipantForJudge)
       .join("\n\n");
 
     const evidenceText = evidence.entries.length > 0
