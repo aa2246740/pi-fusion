@@ -6,6 +6,8 @@ Pi Fusion turns one prompt into a panel of independent model agents, lets them w
 
 It is inspired by hosted Fusion-style APIs, but packaged as a Pi extension: you choose the models, keep the artifacts, and can connect the fusion layer to your existing Pi tools and context.
 
+Website: <https://aa2246740.github.io/pi-fusion/>
+
 Docs: English | [中文](README.zh-CN.md) | [Benchmarks](docs/benchmarks.md) | [中文基准说明](docs/benchmarks.zh-CN.md)
 
 ## What it does

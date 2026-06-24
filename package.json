@@ -4,6 +4,14 @@
   "description": "Model fusion for Pi agents",
   "type": "module",
   "license": "MIT",
+  "homepage": "https://aa2246740.github.io/pi-fusion/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aa2246740/pi-fusion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aa2246740/pi-fusion/issues"
+  },
   "keywords": [
     "pi-package",
     "pi-extension",
