@@ -9,7 +9,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import * as fs from "node:fs/promises";
 import { ConfigManager } from "./src/config.js";
-import { FusionEngine } from "./src/engine.js";
+import { FusionEngine, type FusionProgressEvent } from "./src/engine.js";
 import { ArtifactWriter } from "./src/artifacts.js";
 import { FusionError } from "./src/types.js";
 import type {
@@ -473,6 +473,73 @@ function formatParticipantLine(p: FusionResult["participants"][number]): string 
   return `- P${index + 1} ${icon} ${p.state} ${model}`;
 }
 
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function createFusionProgressUi(
+  ctx: ExtensionContext,
+  options: { mode: "quality" | "fast"; totalParticipants: number },
+): { onProgress: (event: FusionProgressEvent) => void; setMessage: (message: string) => void; dispose: () => void } {
+  const frames = ["-", "\\", "|", "/"];
+  const startedAt = Date.now();
+  const participantStates = Array.from({ length: options.totalParticipants }, () => "pending");
+  let frameIndex = 0;
+  let latestMessage = "Starting Pi Fusion";
+  let phase = "starting";
+  let completedParticipants = 0;
+  let disposed = false;
+
+  const render = () => {
+    if (disposed) return;
+    const frame = frames[frameIndex++ % frames.length];
+    const elapsed = formatElapsed(Date.now() - startedAt);
+    const compact = `${frame} Pi Fusion ${phase} ${elapsed} | P ${completedParticipants}/${options.totalParticipants}`;
+    ctx.ui.setStatus("pi-fusion", compact);
+
+    if (ctx.mode === "tui") {
+      ctx.ui.setWidget("pi-fusion-progress", [
+        `${frame} Pi Fusion running (${options.mode})`,
+        `Elapsed: ${elapsed}`,
+        `Stage: ${latestMessage}`,
+        `Participants: ${completedParticipants}/${options.totalParticipants}`,
+        ...participantStates.map((state, index) => `P${index + 1}: ${state}`),
+      ], { placement: "belowEditor" });
+    }
+  };
+
+  const timer = setInterval(render, 800);
+  render();
+
+  return {
+    onProgress(event) {
+      phase = event.phase;
+      latestMessage = event.message;
+      if (typeof event.completedParticipants === "number") {
+        completedParticipants = event.completedParticipants;
+      }
+      if (event.phase === "participants" && typeof event.slotIndex === "number") {
+        const label = event.model ? `${event.state} ${event.model}` : event.state;
+        participantStates[event.slotIndex] = label;
+      }
+      render();
+    },
+    setMessage(message) {
+      latestMessage = message;
+      render();
+    },
+    dispose() {
+      disposed = true;
+      clearInterval(timer);
+      ctx.ui.setStatus("pi-fusion", undefined);
+      if (ctx.mode === "tui") ctx.ui.setWidget("pi-fusion-progress", undefined);
+    },
+  };
+}
+
 export default function (pi: ExtensionAPI) {
   // Register /pi-fusion command
   pi.registerCommand("pi-fusion", {
@@ -582,23 +649,37 @@ export default function (pi: ExtensionAPI) {
 
       // Run fusion
       ctx.ui.notify("Starting Pi Fusion run...", "info");
+      const progress = createFusionProgressUi(ctx, {
+        mode,
+        totalParticipants: config.participants.length,
+      });
 
       let result: FusionResult;
       try {
         const engine = new FusionEngine(caller, { webBackend });
-        result = await engine.run(config, { prompt, mode, monitor, initialEvidence: localEvidence.evidence });
+        result = await engine.run(
+          config,
+          { prompt, mode, monitor, initialEvidence: localEvidence.evidence },
+          { onProgress: progress.onProgress },
+        );
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         ctx.ui.notify(`Fusion run failed: ${msg}`, "error");
         return;
       } finally {
         await webBackend?.close?.();
+        progress.dispose();
       }
 
       // Write artifacts
+      ctx.ui.setStatus("pi-fusion", "Pi Fusion writing artifacts...");
       const writer = new ArtifactWriter(getArtifactsDir());
-      const artifactsPath = await writer.write(result);
-      result.artifactsPath = artifactsPath;
+      try {
+        const artifactsPath = await writer.write(result);
+        result.artifactsPath = artifactsPath;
+      } finally {
+        ctx.ui.setStatus("pi-fusion", undefined);
+      }
 
       // Format and display Fusion Result
       const lines: string[] = [
@@ -669,7 +750,7 @@ export default function (pi: ExtensionAPI) {
 
       lines.push("");
       lines.push(`## Artifacts`);
-      lines.push(`- Run directory: ${artifactsPath}`);
+      lines.push(`- Run directory: ${result.artifactsPath}`);
 
       lines.push("");
       lines.push(`---`);

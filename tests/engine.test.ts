@@ -6,6 +6,7 @@ import type {
   FusionInput,
   StructuredJudgeAnalysis,
   JudgeVerification,
+  ModelCallResult,
 } from "../src/types.js";
 
 const ANALYSIS: StructuredJudgeAnalysis = {
@@ -62,7 +63,73 @@ function makeCaller(responses: Record<string, string> = {}): ModelCaller {
   };
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (error: unknown) => void } {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+async function waitFor(predicate: () => boolean): Promise<void> {
+  for (let i = 0; i < 50; i++) {
+    if (predicate()) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error("condition was not met");
+}
+
 describe("FusionEngine", () => {
+  it("emits progress events before long participant calls finish", async () => {
+    const events: Array<{ phase: string; state: string; slotIndex?: number; completedParticipants?: number }> = [];
+    const pendingParticipants = new Map<string, ReturnType<typeof deferred<ModelCallResult>>>();
+    const caller: ModelCaller = {
+      async call(request) {
+        const isParticipant = !request.systemPrompt.includes("[PHASE:");
+        if (isParticipant) {
+          const pending = deferred<ModelCallResult>();
+          pendingParticipants.set(request.model, pending);
+          return await pending.promise;
+        }
+        const key = request.systemPrompt.includes("[PHASE: ANALYSIS]") ? "analysis" : request.systemPrompt.includes("[PHASE: DRAFT]") ? "draft" : "other";
+        return {
+          answer: key === "analysis" ? JSON.stringify(ANALYSIS) : "judge answer",
+          model: request.model,
+          tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+          cost: 0,
+        };
+      },
+    };
+
+    const engine = new FusionEngine(caller);
+    const run = engine.run(
+      makeConfig(),
+      { prompt: "test", mode: "fast", monitor: false },
+      { onProgress: (event) => events.push(event) },
+    );
+
+    await waitFor(() => pendingParticipants.size === 2);
+    expect(events).toContainEqual(expect.objectContaining({ phase: "planning", state: "started" }));
+    expect(events).toContainEqual(expect.objectContaining({ phase: "participants", state: "started", slotIndex: 0 }));
+    expect(events).toContainEqual(expect.objectContaining({ phase: "participants", state: "started", slotIndex: 1 }));
+
+    for (const [model, pending] of pendingParticipants) {
+      pending.resolve({
+        answer: `participant answer from ${model}`,
+        model,
+        tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+        cost: 0,
+      });
+    }
+
+    await run;
+    expect(events).toContainEqual(expect.objectContaining({ phase: "participants", state: "completed", completedParticipants: 2 }));
+    expect(events).toContainEqual(expect.objectContaining({ phase: "judging", state: "started" }));
+    expect(events).toContainEqual(expect.objectContaining({ phase: "complete", state: "completed" }));
+  });
+
   it("includes pre-run local evidence in participant context and the evidence pool", async () => {
     const seenMessages: string[] = [];
     const caller: ModelCaller = {

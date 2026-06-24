@@ -30,10 +30,33 @@ import type { WebBackend } from "./web.js";
 export interface FusionRunOptions {
   /** If set to "skip", failed participants are automatically skipped instead of pausing */
   onParticipantFailed?: "pause" | "skip";
+  /** Emits coarse-grained progress for terminal/UI feedback during long runs. */
+  onProgress?: (event: FusionProgressEvent) => void;
 }
 
 export interface FusionEngineDependencies {
   webBackend?: WebBackend;
+}
+
+export type FusionProgressPhase =
+  | "preparing"
+  | "planning"
+  | "evidence"
+  | "participants"
+  | "judging"
+  | "complete";
+
+export type FusionProgressState = "started" | "progress" | "completed" | "failed";
+
+export interface FusionProgressEvent {
+  phase: FusionProgressPhase;
+  state: FusionProgressState;
+  message: string;
+  slotIndex?: number;
+  model?: string;
+  judgeModel?: string;
+  completedParticipants?: number;
+  totalParticipants?: number;
 }
 
 const FUSION_QUORUM_ERROR = "Fusion quorum not met: fewer than 2 Participant Runs succeeded. Returning the only successful participant's raw answer (not a judged Fusion Result).";
@@ -52,6 +75,14 @@ export class FusionEngine {
     input: FusionInput,
     options: FusionRunOptions = {},
   ): Promise<FusionResult> {
+    const emitProgress = (event: FusionProgressEvent) => {
+      try {
+        options.onProgress?.(event);
+      } catch {
+        // Progress UI must never fail the fusion run.
+      }
+    };
+
     const evidence = new EvidenceCollector();
     for (const entry of input.initialEvidence ?? []) evidence.add(entry);
     const retryPolicy = normalizeRetryPolicy(config.retryPolicy ?? DEFAULT_MODEL_RETRY_POLICY);
@@ -59,7 +90,9 @@ export class FusionEngine {
       call: (request) => callModelWithRetry(this.caller, request, retryPolicy),
     };
     const participantRunner = new ParticipantRunner(this.caller, config.defaultFallbacks, retryPolicy);
+    emitProgress({ phase: "preparing", state: "started", message: "Preparing tools and run context" });
     const toolNames = await this.prepareTools(config);
+    emitProgress({ phase: "preparing", state: "completed", message: `Prepared tools: ${toolNames.length > 0 ? toolNames.join(", ") : "none"}` });
 
     // Phase 0: Build a prompt-derived obligation checklist. This is best-effort
     // and must use only the explicit user prompt, never benchmark rubrics or
@@ -67,30 +100,60 @@ export class FusionEngine {
     // collapse into a high-level synthesis.
     let obligationPlan: ObligationPlan | undefined;
     let obligationText = "";
+    emitProgress({ phase: "planning", state: "started", message: "Building prompt obligation checklist" });
     try {
       const planner = new ObligationPlanner(retryingCaller, config.judge.model);
       obligationPlan = await planner.plan(input.prompt);
       obligationText = formatObligationPlanForModel(obligationPlan);
+      emitProgress({ phase: "planning", state: "completed", message: `Planned ${obligationPlan.obligations.length} prompt obligations` });
     } catch {
       // Planning is an optimization, not a hard dependency.
       obligationPlan = undefined;
       obligationText = "";
+      emitProgress({ phase: "planning", state: "failed", message: "Obligation planning skipped; continuing without it" });
     }
 
+    emitProgress({ phase: "evidence", state: "started", message: "Collecting seeded evidence" });
     try {
       const seeded = await seedSecEvidenceFromPrompt(input.prompt, obligationPlan, { signal: undefined });
       for (const entry of seeded) evidence.add(entry);
+      emitProgress({ phase: "evidence", state: "progress", message: seeded.length > 0 ? `Seeded ${seeded.length} SEC evidence entries` : "No SEC seed evidence needed" });
     } catch {
       // SEC seeding is best-effort. Models can still use web tools.
+      emitProgress({ phase: "evidence", state: "failed", message: "SEC seed evidence skipped; continuing" });
     }
-    for (const entry of seedUxSourceCatalog(input.prompt)) evidence.add(entry);
+    const uxSeeded = seedUxSourceCatalog(input.prompt);
+    for (const entry of uxSeeded) evidence.add(entry);
+    emitProgress({
+      phase: "evidence",
+      state: "completed",
+      message: `Evidence seed pool ready (${evidence.getPool().entries.length} entries)`,
+    });
 
     const participantPrompt = obligationText ? `${input.prompt}\n${obligationText}` : input.prompt;
     const seededEvidence = evidence.getPool().entries;
 
     // Phase 1: Run all participants in parallel
-    const participantPromises = config.participants.map((slot, index) =>
-      participantRunner.run(
+    let completedParticipants = 0;
+    const totalParticipants = config.participants.length;
+    emitProgress({
+      phase: "participants",
+      state: "started",
+      message: `Starting ${totalParticipants} participant model${totalParticipants === 1 ? "" : "s"}`,
+      completedParticipants,
+      totalParticipants,
+    });
+    const participantPromises = config.participants.map(async (slot, index) => {
+      emitProgress({
+        phase: "participants",
+        state: "started",
+        message: `P${index + 1} started (${slot.model})`,
+        slotIndex: index,
+        model: slot.model,
+        completedParticipants,
+        totalParticipants,
+      });
+      const output = await participantRunner.run(
         slot,
         participantPrompt,
         toolNames,
@@ -98,10 +161,30 @@ export class FusionEngine {
         index,
         config.defaultFallbacks,
         (entry) => evidence.add(entry),
-      ),
-    );
+      );
+      completedParticipants++;
+      emitProgress({
+        phase: "participants",
+        state: output.error ? "failed" : "completed",
+        message: output.error
+          ? `P${index + 1} failed (${output.model})`
+          : `P${index + 1} completed (${output.model})`,
+        slotIndex: index,
+        model: output.model,
+        completedParticipants,
+        totalParticipants,
+      });
+      return output;
+    });
 
     const participantOutputs = await Promise.all(participantPromises);
+    emitProgress({
+      phase: "participants",
+      state: "completed",
+      message: `Participant phase completed (${completedParticipants}/${totalParticipants})`,
+      completedParticipants,
+      totalParticipants,
+    });
 
     // Phase 2: Build participant statuses
     const participantStatuses: ParticipantStatus[] = participantOutputs.map((output) => {
@@ -137,7 +220,7 @@ export class FusionEngine {
         ? successfulParticipants[0].answer
         : "";
 
-      return {
+      const result = {
         finalAnswer: successfulParticipants.length === 1
           ? `${FUSION_QUORUM_ERROR}\n\n---\n\n${quorumResult}`
           : FUSION_QUORUM_ERROR,
@@ -158,6 +241,8 @@ export class FusionEngine {
         totalCost: participantOutputs.reduce((sum, o) => sum + o.cost, 0),
         totalTokens: sumTokens(participantOutputs),
       };
+      emitProgress({ phase: "complete", state: "completed", message: "Fusion completed without judge quorum" });
+      return result;
     }
 
     // Phase 4: Judge. Retry transient failures for each Judge Model, and if the
@@ -175,27 +260,35 @@ export class FusionEngine {
     for (const judgeModel of judgeModels) {
       const judgeRunner = new JudgeRunner(retryingCaller, judgeModel, toolNames, obligationText);
       try {
+        emitProgress({ phase: "judging", state: "started", message: `Judge analyzing with ${judgeModel}`, judgeModel });
         analysis = await judgeRunner.analyze(input.prompt, successfulParticipants, evidencePool);
+        emitProgress({ phase: "judging", state: "progress", message: "Judge recovering missing obligations", judgeModel });
         judgeRecoveryNotes = await judgeRunner.recoverObligations(input.prompt, analysis, successfulParticipants, evidencePool);
 
         if (input.mode === "fast") {
           // Fast mode: analysis → recovery → draft (used as final)
+          emitProgress({ phase: "judging", state: "progress", message: "Judge drafting final answer", judgeModel });
           finalAnswer = await judgeRunner.draft(input.prompt, analysis, successfulParticipants, evidencePool, judgeRecoveryNotes);
         } else {
           // Quality mode: analysis → recovery → draft → verify → revise
+          emitProgress({ phase: "judging", state: "progress", message: "Judge drafting final answer", judgeModel });
           const draft = await judgeRunner.draft(input.prompt, analysis, successfulParticipants, evidencePool, judgeRecoveryNotes);
+          emitProgress({ phase: "judging", state: "progress", message: "Judge verifying draft", judgeModel });
           verification = await judgeRunner.verify(draft, analysis, evidencePool, judgeRecoveryNotes);
 
           if (verification.pass) {
             finalAnswer = draft;
           } else {
+            emitProgress({ phase: "judging", state: "progress", message: "Judge revising draft after verification", judgeModel });
             finalAnswer = await judgeRunner.revise(draft, verification, input.prompt, evidencePool, judgeRecoveryNotes);
           }
         }
+        emitProgress({ phase: "judging", state: "completed", message: `Judge completed with ${judgeModel}`, judgeModel });
         break;
       } catch (error) {
         lastJudgeError = error;
         const errorType = classifyModelError(error);
+        emitProgress({ phase: "judging", state: "failed", message: `Judge ${judgeModel} failed (${errorType}); trying fallback if available`, judgeModel });
         if (!["rate_limit", "quota", "timeout", "network", "empty_response", "context_limit", "provider_error"].includes(errorType)) {
           throw error;
         }
@@ -210,7 +303,7 @@ export class FusionEngine {
     const allOutputs = [...successfulParticipants];
     const totalCost = allOutputs.reduce((sum, o) => sum + o.cost, 0);
 
-    return {
+    const result = {
       finalAnswer,
       judgeAnalysis: analysis,
       judgeVerification: verification,
@@ -224,6 +317,8 @@ export class FusionEngine {
       totalCost,
       totalTokens: sumTokens(allOutputs),
     };
+    emitProgress({ phase: "complete", state: "completed", message: "Fusion run completed" });
+    return result;
   }
 
   private async prepareTools(config: GlobalFusionConfig): Promise<string[]> {
