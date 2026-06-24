@@ -1,0 +1,41 @@
+{
+  "benchmark": "sanitized-full10",
+  "integrity": {
+    "publicArtifactsAreSanitized": true,
+    "rawArtifactsArchivedPrivately": true,
+    "generationUsedPromptOnlyCases": true,
+    "scoringAfterGeneration": true
+  },
+  "methodology": {
+    "cases": 10,
+    "participants": "fixed 3 OpenAI Codex participants in order",
+    "judge": "GPT-5.5 judge/scorer"
+  },
+  "budgetTarget": 64.7,
+  "runs": [
+    {
+      "run": 129,
+      "full10Score": 65.3,
+      "deltaVsBudgetTarget": 0.6,
+      "casesCompleted": 10,
+      "judgeFailures": 0,
+      "publicStatus": "kept"
+    },
+    {
+      "run": 175,
+      "full10Score": 66.4,
+      "deltaVsBudgetTarget": 1.7,
+      "casesCompleted": 10,
+      "judgeFailures": 0,
+      "publicStatus": "validation"
+    },
+    {
+      "run": 200,
+      "full10Score": 66.2,
+      "deltaVsBudgetTarget": 1.5,
+      "casesCompleted": 10,
+      "judgeFailures": 0,
+      "publicStatus": "validation"
+    }
+  ]
+}

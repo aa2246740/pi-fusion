@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Pi Fusion — Model fusion for Pi agents</title>
+    <meta name="description" content="Pi Fusion turns one prompt into independent model agents, judge synthesis, verification, and local artifacts inside Pi." />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="skip">Skip to content</a>
+    <div class="ambient ambient-a" aria-hidden="true"></div>
+    <div class="ambient ambient-b" aria-hidden="true"></div>
+
+    <header class="topbar" data-reveal>
+      <nav class="nav shell" aria-label="Primary navigation">
+        <a class="brand" href="#hero" aria-label="Pi Fusion home">
+          <span class="brand-mark">π</span>
+          <span>Fusion</span>
+        </a>
+        <button class="nav-toggle" type="button" aria-controls="nav-links" aria-expanded="false">
+          <span class="sr-only" data-i18n="toggleNav">Toggle navigation</span>
+          <span></span><span></span><span></span>
+        </button>
+        <div class="nav-links" id="nav-links">
+          <a href="#overview" data-i18n="navOverview">Overview</a>
+          <a href="#features" data-i18n="navFeatures">Features</a>
+          <a href="#workflow" data-i18n="navWorkflow">Workflow</a>
+          <a href="#benchmarks" data-i18n="navBenchmarks">Benchmarks</a>
+          <a href="#docs" data-i18n="navDocs">Docs</a>
+          <a class="github-link" href="https://github.com/aa2246740/pi-fusion" data-github-link target="_blank" rel="noreferrer" data-i18n="navGithub">GitHub</a>
+          <button class="language-toggle" type="button" data-language-toggle aria-label="Switch language"><span data-i18n="languageToggle">中文</span></button>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero section" id="hero">
+        <div class="shell hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow" data-reveal data-i18n="heroEyebrow">Model fusion for Pi agents</p>
+            <h1 data-reveal data-i18n="heroHeadline">One prompt. A panel of models. One answer you can trust.</h1>
+            <p class="hero-lede" data-reveal data-i18n="heroLede">Pi Fusion turns a single high-stakes prompt into independent model answers, surfaces contradictions instead of hiding them, and lets a judge model synthesize, verify, and report the final answer — right inside Pi.</p>
+            <div class="hero-actions" data-reveal>
+              <a class="button button-primary" href="#install" data-i18n="installCta">Install Pi Fusion</a>
+              <a class="button button-secondary" href="#workflow" data-i18n="workflowCta">See the workflow</a>
+              <a class="button button-ghost" href="https://github.com/aa2246740/pi-fusion" data-github-link target="_blank" rel="noreferrer" data-i18n="githubCta">Open GitHub</a>
+            </div>
+            <div class="command-card hero-command" data-reveal>
+              <div class="code-head">
+                <span data-i18n="installLabel">Install</span>
+                <button type="button" data-copy="#install-command" data-i18n="copy">Copy</button>
+              </div>
+              <pre id="install-command"><code data-install-command>pi install git:https://github.com/aa2246740/pi-fusion@main</code></pre>
+            </div>
+            <p class="trust-row" data-reveal data-i18n="trustRow">You choose the models · Optional evidence tools · Local artifacts and cost reporting</p>
+          </div>
+
+          <div class="fusion-visual" aria-label="Animated fusion diagram" data-reveal>
+            <div class="visual-shell">
+              <div class="orbit orbit-one" aria-hidden="true"></div>
+              <div class="orbit orbit-two" aria-hidden="true"></div>
+              <div class="beam beam-a" aria-hidden="true"></div>
+              <div class="beam beam-b" aria-hidden="true"></div>
+              <div class="node participant node-a"><span>P1</span></div>
+              <div class="node participant node-b"><span>P2</span></div>
+              <div class="node participant node-c"><span>P3</span></div>
+              <div class="node participant node-d"><span>P4</span></div>
+              <div class="judge-core"><span class="core-label" data-i18n="judge">Judge</span><span class="core-pulse" aria-hidden="true"></span></div>
+              <div class="artifact-card"><span>final-answer.md</span><strong data-i18n="artifactText">Consensus + caveats</strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section split-section" id="overview">
+        <div class="shell split-grid">
+          <article class="glass-panel" data-reveal>
+            <p class="eyebrow" data-i18n="problemEyebrow">The single-model problem</p>
+            <h2 data-i18n="problemHeading">One model answer isn’t always enough.</h2>
+            <p data-i18n="problemCopy">When the stakes are high, a single response can miss tradeoffs, bury contradictions, or commit to one viewpoint before alternatives are even considered.</p>
+          </article>
+          <article class="glass-panel accent-panel" data-reveal>
+            <p class="eyebrow" data-i18n="solutionEyebrow">The fusion answer</p>
+            <h2 data-i18n="solutionHeading">Run a panel. Reconcile differences. Decide with evidence.</h2>
+            <p data-i18n="solutionCopy">Pi Fusion runs multiple participant models in parallel, compares their answers, and uses a judge model to synthesize a final response — with optional evidence gathering, verification, and durable artifacts kept locally.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section features" id="features">
+        <div class="shell">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow" data-i18n="featuresEyebrow">Capabilities</p>
+            <h2 data-i18n="featuresHeading">Built for decisions that deserve more than one guess.</h2>
+            <p data-i18n="featuresIntro">Use it for research, planning, architecture decisions, debugging hypotheses, code review, vendor comparisons, writing, and document synthesis.</p>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card" data-reveal><span class="feature-icon">01</span><h3 data-i18n="feature1Title">Parallel participant models</h3><p data-i18n="feature1Copy">Independent answers from multiple models, side by side.</p></article>
+            <article class="feature-card" data-reveal><span class="feature-icon">02</span><h3 data-i18n="feature2Title">Judge synthesis</h3><p data-i18n="feature2Copy">A judge model reconciles, notes contradictions, and reports the final answer.</p></article>
+            <article class="feature-card" data-reveal><span class="feature-icon">03</span><h3 data-i18n="feature3Title">Verification & revision</h3><p data-i18n="feature3Copy">Optionally re-check and refine before the answer is final.</p></article>
+            <article class="feature-card" data-reveal><span class="feature-icon">04</span><h3 data-i18n="feature4Title">Optional evidence layer</h3><p data-i18n="feature4Copy">Connect provider-agnostic search and fetch tools when current, sourced answers matter.</p></article>
+            <article class="feature-card" data-reveal><span class="feature-icon">05</span><h3 data-i18n="feature5Title">Local artifacts & costs</h3><p data-i18n="feature5Copy">Evidence summaries, token usage, and cost reporting stay with you.</p></article>
+            <article class="feature-card" data-reveal><span class="feature-icon">06</span><h3 data-i18n="feature6Title">Fallback & retry policy</h3><p data-i18n="feature6Copy">Configurable fallback and retry behavior keeps panel runs resilient.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section workflow" id="workflow">
+        <div class="shell workflow-grid">
+          <div class="workflow-copy" data-reveal>
+            <p class="eyebrow" data-i18n="workflowEyebrow">Workflow</p>
+            <h2 data-i18n="workflowHeading">From prompt to verified artifact.</h2>
+            <p data-i18n="workflowIntro">The panel fans out, evidence is attached when available, and the judge turns disagreement into a stronger answer.</p>
+          </div>
+          <div class="workflow-board" data-reveal>
+            <div class="workflow-progress" aria-hidden="true"><span class="workflow-progress-fill"></span></div>
+            <ol class="workflow-steps">
+              <li class="workflow-step is-active"><span>01</span><div><h3 data-i18n="step1Title">Prompt in</h3><p data-i18n="step1Copy">One prompt enters the fusion panel.</p></div></li>
+              <li class="workflow-step"><span>02</span><div><h3 data-i18n="step2Title">Parallel answers</h3><p data-i18n="step2Copy">Participant models respond independently.</p></div></li>
+              <li class="workflow-step"><span>03</span><div><h3 data-i18n="step3Title">Evidence optional</h3><p data-i18n="step3Copy">Search, fetch, and local read-only context can be used when configured.</p></div></li>
+              <li class="workflow-step"><span>04</span><div><h3 data-i18n="step4Title">Judge synthesis</h3><p data-i18n="step4Copy">The judge compares agreements, contradictions, and missing evidence.</p></div></li>
+              <li class="workflow-step"><span>05</span><div><h3 data-i18n="step5Title">Verified artifact</h3><p data-i18n="step5Copy">The final answer, evidence summary, token usage, and cost report are saved locally.</p></div></li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="section commands" id="commands">
+        <div class="shell commands-grid">
+          <div class="section-heading compact" data-reveal>
+            <p class="eyebrow" data-i18n="commandsEyebrow">Pi-native</p>
+            <h2 data-i18n="commandsHeading">Three commands. That’s the surface area.</h2>
+            <p data-i18n="commandsIntro">Configure the panel, diagnose availability, then run fusion from the place you already work.</p>
+          </div>
+          <div class="code-stack" data-reveal>
+            <div class="command-card"><div class="code-head"><span data-i18n="commandsLabel">Commands</span><button type="button" data-copy="#commands-code" data-i18n="copy">Copy</button></div><pre id="commands-code"><code>/pi-fusion-config       Configure participants, judge, fallbacks, tools
+/pi-fusion-doctor       Diagnose model and evidence backend availability
+/pi-fusion &lt;prompt&gt;     Run a fusion panel</code></pre></div>
+            <div class="command-card"><div class="code-head"><span data-i18n="examplesLabel">Examples</span><button type="button" data-copy="#examples-code" data-i18n="copy">Copy</button></div><pre id="examples-code"><code>/pi-fusion Should we migrate this module to a plugin architecture?
+/pi-fusion --fast Summarize the tradeoffs of these three plans.
+/pi-fusion --quality Compare vendors and cite current sources.</code></pre></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section benchmarks" id="benchmarks">
+        <div class="shell">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow" data-i18n="benchEyebrow">DRACO benchmark</p>
+            <h2 data-i18n="benchHeading">Pi Fusion exceeds the Fusion API budget baseline.</h2>
+            <p data-i18n="benchIntro">Pi Fusion is not just a demo of multi-model prompting. We tested it on the same DRACO 10-case benchmark protocol used to evaluate Fusion API budget mode. Pi Fusion exceeded the 64.70 Fusion API budget baseline, reaching 66.40 in full validation and 66.20 in the latest repeat validation, with all 10 cases completed and no judge failures.</p>
+          </div>
+          <div class="metric-strip" data-reveal>
+            <div><span class="metric-label" data-i18n="metricPeak">Best validation</span><strong class="metric-value">66.40</strong></div>
+            <div><span class="metric-label" data-i18n="metricDelta">Delta vs budget</span><strong class="metric-value" data-count-to="1.70">+1.70</strong></div>
+            <div><span class="metric-label" data-i18n="metricFailures">Judge failures</span><strong class="metric-value">0</strong></div>
+          </div>
+          <div class="table-wrap" data-reveal>
+            <table>
+              <thead><tr><th data-i18n="tableSystem">System / run</th><th>full10 score</th><th data-i18n="tableDelta">Δ vs Fusion API budget</th></tr></thead>
+              <tbody>
+                <tr><td data-i18n="rowBudget">Fusion API budget baseline</td><td>64.70</td><td>—</td></tr>
+                <tr><td data-i18n="rowKept">Pi Fusion kept validation</td><td>65.30</td><td>+0.60</td></tr>
+                <tr><td data-i18n="rowBest">Pi Fusion best validation</td><td>66.40</td><td>+1.70</td></tr>
+                <tr><td data-i18n="rowLatest">Pi Fusion latest validation</td><td>66.20</td><td>+1.50</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="footnote" data-reveal data-i18n="benchFootnote">Generation used sanitized prompt-only case files. The benchmark answer/rubric/scoring artifacts were not available to Pi Fusion during generation and were used only after generation by the scorer.</p>
+        </div>
+      </section>
+
+      <section class="section safety" id="safety">
+        <div class="shell">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow" data-i18n="safetyEyebrow">Safety & control</p>
+            <h2 data-i18n="safetyHeading">Powerful tools, kept on a short leash.</h2>
+            <p data-i18n="safetyIntro">No multi-agent writes to your real workspace. Evidence and artifacts are explicit, reviewable, and local.</p>
+          </div>
+          <div class="safety-grid">
+            <article class="safety-card" data-reveal><h3 data-i18n="safe1Title">Sandboxed bash</h3><p data-i18n="safe1Copy">Deterministic calculations run in a sandboxed environment.</p></article>
+            <article class="safety-card" data-reveal><h3 data-i18n="safe2Title">Read-only local context</h3><p data-i18n="safe2Copy">Imported files are explicit evidence, not hidden state.</p></article>
+            <article class="safety-card" data-reveal><h3 data-i18n="safe3Title">Optional backends</h3><p data-i18n="safe3Copy">Fusion still works without search or fetch tools.</p></article>
+            <article class="safety-card" data-reveal><h3 data-i18n="safe4Title">Pi-native control</h3><p data-i18n="safe4Copy">You choose the models, fallbacks, tools, and reporting behavior.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section docs" id="docs">
+        <div class="shell docs-grid">
+          <div class="section-heading compact" data-reveal>
+            <p class="eyebrow" data-i18n="docsEyebrow">Docs</p>
+            <h2 data-i18n="docsHeading">English-first repo, Chinese docs included.</h2>
+            <p data-i18n="docsIntro">The GitHub repository is English-first for open-source discoverability, with Chinese documentation for local users and contributors.</p>
+          </div>
+          <div class="doc-links" data-reveal>
+            <a href="https://github.com/aa2246740/pi-fusion/blob/main/README.md" data-repo-path="README.md" data-i18n="docReadme">README</a>
+            <a href="https://github.com/aa2246740/pi-fusion/blob/main/README.zh-CN.md" data-repo-path="README.zh-CN.md" data-i18n="docChinese">Chinese README</a>
+            <a href="https://github.com/aa2246740/pi-fusion/blob/main/docs/benchmarks.md" data-repo-path="docs/benchmarks.md" data-i18n="docBench">Benchmark notes</a>
+            <a href="https://github.com/aa2246740/pi-fusion/blob/main/docs/benchmarks.zh-CN.md" data-repo-path="docs/benchmarks.zh-CN.md" data-i18n="docBenchZh">Chinese benchmark notes</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section cta" id="install">
+        <div class="shell cta-panel" data-reveal>
+          <p class="eyebrow" data-i18n="finalEyebrow">Install</p>
+          <h2 data-i18n="finalHeading">Put your next hard question to a panel.</h2>
+          <p data-i18n="finalIntro">Install Pi Fusion, configure your participant and judge models, then run your first fusion panel in minutes.</p>
+          <div class="cta-actions">
+            <a class="button button-primary" href="https://github.com/aa2246740/pi-fusion" data-github-link target="_blank" rel="noreferrer" data-i18n="githubCta">Open GitHub</a>
+            <a class="button button-secondary" href="#commands" data-i18n="configureCta">Configure models</a>
+            <a class="button button-ghost" href="#commands" data-i18n="doctorCta">Run /pi-fusion-doctor</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="shell footer-grid">
+        <div><a class="brand footer-brand" href="#hero"><span class="brand-mark">π</span><span>Fusion</span></a><p data-i18n="footerTagline">Model fusion for Pi agents.</p></div>
+        <div><h3 data-i18n="footerProduct">Product</h3><a href="#overview" data-i18n="navOverview">Overview</a><a href="#features" data-i18n="navFeatures">Features</a><a href="#workflow" data-i18n="navWorkflow">Workflow</a><a href="#benchmarks" data-i18n="navBenchmarks">Benchmarks</a></div>
+        <div><h3 data-i18n="footerResources">Resources</h3><a href="#install" data-i18n="installLabel">Install</a><a href="#commands" data-i18n="commandsLabel">Commands</a><a href="#docs" data-i18n="navDocs">Docs</a></div>
+        <div><h3 data-i18n="footerProject">Project</h3><a href="https://github.com/aa2246740/pi-fusion" data-github-link target="_blank" rel="noreferrer" data-i18n="navGithub">GitHub</a><a href="https://github.com/aa2246740/pi-fusion/blob/main/LICENSE" data-repo-path="LICENSE" data-i18n="license">MIT License</a></div>
+      </div>
+      <p class="footer-bottom" data-i18n="footerBottom">Built for decisions that deserve more than one guess.</p>
+    </footer>
+
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script defer src="main.js"></script>
+  </body>
+</html>
