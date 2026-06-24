@@ -1,9 +1,12 @@
 {
-  "name": "pi-fusion",
+  "name": "@aa2246740/pi-fusion",
   "version": "0.1.0",
   "description": "Model fusion for Pi agents",
   "type": "module",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "homepage": "https://aa2246740.github.io/pi-fusion/",
   "repository": {
     "type": "git",

@@ -33,6 +33,12 @@ Pi Fusion 是 Pi package/extension。
 pi install git:https://github.com/aa2246740/pi-fusion@main
 ```
 
+npm package 名称：
+
+```bash
+npm install @aa2246740/pi-fusion
+```
+
 本地开发：
 
 ```bash

@@ -33,6 +33,12 @@ Pi Fusion is a Pi package/extension.
 pi install git:https://github.com/aa2246740/pi-fusion@main
 ```
 
+The npm package name is:
+
+```bash
+npm install @aa2246740/pi-fusion
+```
+
 For local development:
 
 ```bash
