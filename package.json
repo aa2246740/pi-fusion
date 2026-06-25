@@ -28,7 +28,11 @@
   "files": [
     "index.ts",
     "src/**/*.ts",
-    "docs/**/*",
+    "docs/*.html",
+    "docs/*.css",
+    "docs/*.js",
+    "docs/*.json",
+    "docs/*.md",
     "README.md",
     "README.zh-CN.md",
     "LICENSE",

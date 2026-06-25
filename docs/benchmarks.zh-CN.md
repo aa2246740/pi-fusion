@@ -8,6 +8,16 @@ Pi Fusion 在 scored DRACO full10 validations 上超过 Fusion API budget baseli
 
 我们在同一个用于对比 Fusion API budget baseline 的 10-case DRACO benchmark protocol 上评估了 Pi Fusion。
 
+## Scoring 录屏
+
+仓库包含一段 scoring 阶段短录屏：
+
+[观看 DRACO scorer 录屏](assets/draco-scored-validation.mp4)
+
+这段视频展示了关键 integrity boundary：final answers 已经 sealed，之后 scorer 才加载 rubric 并产出 DRACO scores。
+
+## Validation summary
+
 | System / run | full10 score | 相对 Fusion API budget |
 | --- | ---: | ---: |
 | Fusion API budget baseline | 64.70 | - |

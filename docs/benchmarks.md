@@ -8,6 +8,16 @@ In this document, **DRACO-verified** means the claim is backed by completed 10-c
 
 We evaluated Pi Fusion on the same 10-case DRACO benchmark protocol used to compare against the Fusion API budget baseline.
 
+## Scoring recording
+
+The repository includes a short recording of the scoring stage:
+
+[Watch the DRACO scorer recording](assets/draco-scored-validation.mp4)
+
+The video shows the important integrity boundary: final answers are already sealed before the scorer loads the rubric and emits DRACO scores.
+
+## Validation summary
+
 | System / run | full10 score | Delta vs Fusion API budget |
 | --- | ---: | ---: |
 | Fusion API budget baseline | 64.70 | - |

@@ -746,6 +746,78 @@ pre {
   letter-spacing: 0;
 }
 
+.benchmark-showcase {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.benchmark-video,
+.verification-panel {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022));
+  box-shadow: var(--shadow);
+}
+
+.benchmark-video {
+  overflow: hidden;
+}
+
+.benchmark-video video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1670 / 1080;
+  background: #020405;
+}
+
+.benchmark-video figcaption {
+  padding: 14px 16px 16px;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+.verification-panel {
+  display: grid;
+  align-content: start;
+  padding: 22px;
+}
+
+.verification-panel h3 {
+  margin-bottom: 18px;
+}
+
+.verification-table {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.08);
+  border-radius: var(--radius);
+  background: rgba(226, 232, 240, 0.08);
+}
+
+.verification-table > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  background: rgba(5, 9, 12, 0.76);
+}
+
+.verification-table span {
+  color: var(--text-faint);
+  font-size: 0.83rem;
+}
+
+.verification-table strong {
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -950,6 +1022,7 @@ td:nth-child(3) {
   .feature-grid,
   .safety-grid,
   .metric-strip,
+  .benchmark-showcase,
   .footer-grid,
   .doc-links {
     grid-template-columns: 1fr;

@@ -157,6 +157,22 @@
             <div><span class="metric-label" data-i18n="metricDelta">Delta vs budget</span><strong class="metric-value" data-count-to="1.70">+1.70</strong></div>
             <div><span class="metric-label" data-i18n="metricFailures">Judge failures</span><strong class="metric-value">0</strong></div>
           </div>
+          <div class="benchmark-showcase" data-reveal>
+            <figure class="benchmark-video">
+              <video controls preload="metadata" playsinline src="assets/draco-scored-validation.mp4" aria-label="Pi Fusion DRACO scorer recording"></video>
+              <figcaption data-i18n="benchVideoCaption">A real scoring-stage recording: final answers are already sealed, then the scorer loads the rubric and produces DRACO scores.</figcaption>
+            </figure>
+            <div class="verification-panel">
+              <h3 data-i18n="verifyHeading">Verification checklist</h3>
+              <div class="verification-table" role="table" aria-label="DRACO verification checklist">
+                <div role="row"><span role="cell" data-i18n="verifyCasesLabel">Cases</span><strong role="cell" data-i18n="verifyCasesValue">10/10 completed</strong></div>
+                <div role="row"><span role="cell" data-i18n="verifyGenerationLabel">Generation input</span><strong role="cell" data-i18n="verifyGenerationValue">Sanitized prompt-only cases</strong></div>
+                <div role="row"><span role="cell" data-i18n="verifyRubricLabel">Rubric access</span><strong role="cell" data-i18n="verifyRubricValue">Scorer-only after seal</strong></div>
+                <div role="row"><span role="cell" data-i18n="verifyBaselineLabel">Baseline</span><strong role="cell" data-i18n="verifyBaselineValue">Fusion API budget, 64.70</strong></div>
+                <div role="row"><span role="cell" data-i18n="verifyArtifactLabel">Public artifacts</span><strong role="cell" data-i18n="verifyArtifactValue">Sanitized aggregates only</strong></div>
+              </div>
+            </div>
+          </div>
           <div class="table-wrap" data-reveal>
             <table>
               <thead><tr><th data-i18n="tableSystem">System / run</th><th>full10 score</th><th data-i18n="tableDelta">Δ vs Fusion API budget</th></tr></thead>
