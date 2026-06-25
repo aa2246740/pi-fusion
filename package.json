@@ -1,7 +1,7 @@
 {
   "name": "@aa2246740/pi-fusion",
   "version": "0.1.1",
-  "description": "Model fusion for Pi agents",
+  "description": "DRACO-verified model fusion for Pi agents",
   "type": "module",
   "license": "MIT",
   "publishConfig": {
@@ -18,6 +18,9 @@
   "keywords": [
     "pi-package",
     "pi-extension",
+    "draco",
+    "benchmark",
+    "scored-validation",
     "model-fusion",
     "multi-model",
     "agent"

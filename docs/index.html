@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>Pi Fusion — Model fusion for Pi agents</title>
-    <meta name="description" content="Pi Fusion turns one prompt into independent model agents, judge synthesis, verification, and local artifacts inside Pi." />
+    <title>Pi Fusion — DRACO-verified model fusion for Pi agents</title>
+    <meta name="description" content="Pi Fusion is DRACO-verified model fusion for Pi agents: scored full10 validation, prompt-only generation, scorer-only rubric access, and local artifacts." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -39,9 +39,9 @@
       <section class="hero section" id="hero">
         <div class="shell hero-grid">
           <div class="hero-copy">
-            <p class="eyebrow" data-reveal data-i18n="heroEyebrow">Model fusion for Pi agents</p>
-            <h1 data-reveal data-i18n="heroHeadline">One prompt. A panel of models. One answer you can trust.</h1>
-            <p class="hero-lede" data-reveal data-i18n="heroLede">Pi Fusion turns a single high-stakes prompt into independent model answers, surfaces contradictions instead of hiding them, and lets a judge model synthesize, verify, and report the final answer — right inside Pi.</p>
+            <p class="eyebrow" data-reveal data-i18n="heroEyebrow">DRACO-verified model fusion for Pi agents</p>
+            <h1 data-reveal data-i18n="heroHeadline">Not just a fusion demo. Scored on DRACO full10.</h1>
+            <p class="hero-lede" data-reveal data-i18n="heroLede">Pi Fusion turns one high-stakes prompt into independent model answers, then uses judge synthesis, verification, and scorer-only benchmark validation to make the result inspectable instead of just plausible.</p>
             <div class="hero-actions" data-reveal>
               <a class="button button-primary" href="#install" data-i18n="installCta">Install Pi Fusion</a>
               <a class="button button-secondary" href="#workflow" data-i18n="workflowCta">See the workflow</a>
@@ -54,7 +54,7 @@
               </div>
               <pre id="install-command"><code data-install-command>pi install git:https://github.com/aa2246740/pi-fusion@main</code></pre>
             </div>
-            <p class="trust-row" data-reveal data-i18n="trustRow">You choose the models · Optional evidence tools · Local artifacts and cost reporting</p>
+            <p class="trust-row" data-reveal data-i18n="trustRow">DRACO full10 scored · Prompt-only generation · Scorer-only rubric access</p>
           </div>
 
           <div class="fusion-visual" aria-label="Animated fusion diagram" data-reveal>
@@ -68,7 +68,7 @@
               <div class="node participant node-c"><span>P3</span></div>
               <div class="node participant node-d"><span>P4</span></div>
               <div class="judge-core"><span class="core-label" data-i18n="judge">Judge</span><span class="core-pulse" aria-hidden="true"></span></div>
-              <div class="artifact-card"><span>final-answer.md</span><strong data-i18n="artifactText">Consensus + caveats</strong></div>
+              <div class="artifact-card"><span>final-answer.md</span><strong data-i18n="artifactText">Scored artifact trail</strong></div>
             </div>
           </div>
         </div>
@@ -111,8 +111,8 @@
         <div class="shell workflow-grid">
           <div class="workflow-copy" data-reveal>
             <p class="eyebrow" data-i18n="workflowEyebrow">Workflow</p>
-            <h2 data-i18n="workflowHeading">From prompt to verified artifact.</h2>
-            <p data-i18n="workflowIntro">The panel fans out, evidence is attached when available, and the judge turns disagreement into a stronger answer.</p>
+            <h2 data-i18n="workflowHeading">From prompt to scored artifact.</h2>
+            <p data-i18n="workflowIntro">The panel fans out, evidence is attached when available, and the judge turns disagreement into a stronger answer that can be benchmarked after generation is sealed.</p>
           </div>
           <div class="workflow-board" data-reveal>
             <div class="workflow-progress" aria-hidden="true"><span class="workflow-progress-fill"></span></div>
@@ -149,11 +149,11 @@
         <div class="shell">
           <div class="section-heading" data-reveal>
             <p class="eyebrow" data-i18n="benchEyebrow">DRACO benchmark</p>
-            <h2 data-i18n="benchHeading">Pi Fusion exceeds the Fusion API budget baseline.</h2>
-            <p data-i18n="benchIntro">Pi Fusion is not just a demo of multi-model prompting. We tested it on the same DRACO 10-case benchmark protocol used to evaluate Fusion API budget mode. Pi Fusion exceeded the 64.70 Fusion API budget baseline, reaching 66.40 in full validation and 66.20 in the latest repeat validation, with all 10 cases completed and no judge failures.</p>
+            <h2 data-i18n="benchHeading">Scored DRACO validation that clears the Fusion API budget baseline.</h2>
+            <p data-i18n="benchIntro">Pi Fusion is not just a demo of multi-model prompting. We tested it on the same DRACO 10-case benchmark protocol used to evaluate Fusion API budget mode: prompt-only generation first, scorer-only rubric access after answers were sealed. Pi Fusion reached 66.40 in full validation and 66.20 in the latest repeat validation, above the 64.70 budget baseline, with all 10 cases completed and no judge failures.</p>
           </div>
           <div class="metric-strip" data-reveal>
-            <div><span class="metric-label" data-i18n="metricPeak">Best validation</span><strong class="metric-value">66.40</strong></div>
+            <div><span class="metric-label" data-i18n="metricPeak">Best DRACO full10</span><strong class="metric-value">66.40</strong></div>
             <div><span class="metric-label" data-i18n="metricDelta">Delta vs budget</span><strong class="metric-value" data-count-to="1.70">+1.70</strong></div>
             <div><span class="metric-label" data-i18n="metricFailures">Judge failures</span><strong class="metric-value">0</strong></div>
           </div>
@@ -168,7 +168,7 @@
               </tbody>
             </table>
           </div>
-          <p class="footnote" data-reveal data-i18n="benchFootnote">Generation used sanitized prompt-only case files. The benchmark answer/rubric/scoring artifacts were not available to Pi Fusion during generation and were used only after generation by the scorer.</p>
+          <p class="footnote" data-reveal data-i18n="benchFootnote">DRACO-verified here means completed scored runs under this protocol. It is not a claim that Pi Fusion beats every Fusion API mode. Generation used sanitized prompt-only case files; answer/rubric/scoring artifacts were available only to the post-generation scorer.</p>
         </div>
       </section>
 
@@ -220,7 +220,7 @@
 
     <footer class="footer">
       <div class="shell footer-grid">
-        <div><a class="brand footer-brand" href="#hero"><span class="brand-mark">π</span><span>Fusion</span></a><p data-i18n="footerTagline">Model fusion for Pi agents.</p></div>
+        <div><a class="brand footer-brand" href="#hero"><span class="brand-mark">π</span><span>Fusion</span></a><p data-i18n="footerTagline">DRACO-verified model fusion for Pi agents.</p></div>
         <div><h3 data-i18n="footerProduct">Product</h3><a href="#overview" data-i18n="navOverview">Overview</a><a href="#features" data-i18n="navFeatures">Features</a><a href="#workflow" data-i18n="navWorkflow">Workflow</a><a href="#benchmarks" data-i18n="navBenchmarks">Benchmarks</a></div>
         <div><h3 data-i18n="footerResources">Resources</h3><a href="#install" data-i18n="installLabel">Install</a><a href="#commands" data-i18n="commandsLabel">Commands</a><a href="#docs" data-i18n="navDocs">Docs</a></div>
         <div><h3 data-i18n="footerProject">Project</h3><a href="https://github.com/aa2246740/pi-fusion" data-github-link target="_blank" rel="noreferrer" data-i18n="navGithub">GitHub</a><a href="https://github.com/aa2246740/pi-fusion/blob/main/LICENSE" data-repo-path="LICENSE" data-i18n="license">MIT License</a></div>

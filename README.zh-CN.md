@@ -1,14 +1,26 @@
 # Pi Fusion
 
-**给 Pi agents 用的模型融合。**
+**经过 DRACO 评分验证的 Pi agents 模型融合。**
 
 Pi Fusion 会把一个 prompt 分发给一组独立模型，让它们并行工作、可选地收集 evidence，再由 judge model 综合、验证并输出最终答案，整个过程发生在 Pi 里。
+
+它的重点不只是“多跑几个模型再合并文本”。Pi Fusion 已经做过 DRACO full10 评分验证：生成阶段只看 prompt-only cases，rubric 只在生成结束后的 scorer 阶段加载，10 个 case 全部完成，并提供 sanitized public benchmark summary。
 
 它受 hosted Fusion-style APIs 启发，但实现为 Pi extension：你选择模型，保留 artifacts，并且可以把 fusion layer 接到现有 Pi 工具和上下文中。
 
 官网：<https://aa2246740.github.io/pi-fusion/>
 
 文档：[English](README.md) | 中文 | [Benchmarks](docs/benchmarks.md) | [中文基准说明](docs/benchmarks.zh-CN.md)
+
+## 这个仓库为什么突出
+
+很多 fusion demo 停在“运行多个模型并合并答案”。Pi Fusion 的定位是有评分验证的 fusion engine：
+
+- **DRACO full10 tested**：在 10-case DRACO benchmark protocol 上完成验证。
+- **Scorer-only rubric access**：生成阶段使用 sanitized prompt-only cases；answer/rubric/scoring artifacts 只在生成后由 scorer 加载。
+- **对比 budget baseline**：公开 validations 超过 64.70 的 Fusion API budget baseline，分数为 65.30、66.40 和 66.20。
+- **latest validation 0 judge failures**：最新公开 validation 完成全部 10 个 case。
+- **便于审计的 artifacts**：run artifacts、evidence summaries、token usage 和 cost reports 保存在本地；公开 benchmark summary 只发布 sanitized aggregate。
 
 ## 它能做什么
 
@@ -169,9 +181,11 @@ Pi Fusion 可以解析带有 `content`、`text` 或 `markdown` 的常见 fetch s
 
 Sandbox 写入不会修改真实用户 workspace。运行结束后，Pi Fusion 会把每个 participant 的 sandbox root、变更文件列表和 ChangeSet artifacts 写到 run directory，方便 judge 和用户审查具体文件级工作，而不是只看纯文字回答。
 
-## DRACO benchmark
+## DRACO 评分验证结果
 
-Pi Fusion exceeds the Fusion API budget baseline on the DRACO 10-case benchmark。
+Pi Fusion 在 scored DRACO full10 validations 上超过 Fusion API budget baseline。
+
+在这个仓库里，**DRACO verified** 指的是公开 benchmark claim 有完整 DRACO 10-case runs、prompt-only generation、scorer-only rubric access 和 sanitized aggregate results 支撑。它不是说 Pi Fusion 超过所有 Fusion API modes。
 
 我们在同一个用于对比 Fusion API budget baseline 的 10-case DRACO benchmark protocol 上评估了 Pi Fusion。
 

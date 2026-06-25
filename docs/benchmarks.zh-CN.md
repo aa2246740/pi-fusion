@@ -1,8 +1,10 @@
 # DRACO benchmark
 
-Pi Fusion 是给 Pi agents 用的通用 model-fusion layer。我们用 research-style tasks 做 benchmark，因为这类任务可以和 hosted Fusion-style APIs 对比，也可以客观打分。
+Pi Fusion 是给 Pi agents 用的通用 model-fusion layer。它的开源定位重点是有评分验证：DRACO full10 runs、prompt-only generation、scorer-only rubric access，以及 sanitized aggregate results。
 
-Pi Fusion exceeds the Fusion API budget baseline on the DRACO 10-case benchmark。
+Pi Fusion 在 scored DRACO full10 validations 上超过 Fusion API budget baseline。
+
+本文里的 **DRACO verified** 指的是公开 claim 有完整 10-case DRACO benchmark runs 和 generation 之后的 scoring 支撑。它不表示 Pi Fusion 得到了 DRACO 官方认证，也不是说 Pi Fusion 超过所有 Fusion API modes。
 
 我们在同一个用于对比 Fusion API budget baseline 的 10-case DRACO benchmark protocol 上评估了 Pi Fusion。
 
@@ -50,5 +52,7 @@ Generation 使用 sanitized prompt-only cases。Scoring 只发生在 generation 
 ## Interpretation
 
 这些结果说明，在 sanitized full10 validations 上，Pi Fusion 的 fusion pattern 超过了 64.70 的 Fusion API budget baseline。它们是对 model-fusion approach 的证据，不是说 Pi Fusion 整体超过 Fusion API，也不是说它超过所有 Fusion API modes。
+
+关键差异在于：Pi Fusion 不是一个没有评分的 multi-model prompt demo。它的 benchmark claim 绑定固定 protocol、完成的 full10 runs，以及 generation sealed 之后才发生的 scoring。
 
 Pi Fusion 仍然应该在其他任务类型上单独评估，例如 planning、debugging、review、writing 和 decision support。

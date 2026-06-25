@@ -1,14 +1,26 @@
 # Pi Fusion
 
-**Model fusion for Pi agents.**
+**DRACO-verified model fusion for Pi agents.**
 
 Pi Fusion turns one prompt into a panel of independent model agents, lets them work in parallel, optionally gather evidence, then uses a judge model to synthesize, verify, and report the final answer inside Pi.
+
+The core claim is not just orchestration. Pi Fusion has scored DRACO full10 validation runs: prompt-only generation, scorer-only rubric access, all 10 cases completed, and sanitized public benchmark summaries.
 
 It is inspired by hosted Fusion-style APIs, but packaged as a Pi extension: you choose the models, keep the artifacts, and can connect the fusion layer to your existing Pi tools and context.
 
 Website: <https://aa2246740.github.io/pi-fusion/>
 
 Docs: English | [中文](README.zh-CN.md) | [Benchmarks](docs/benchmarks.md) | [中文基准说明](docs/benchmarks.zh-CN.md)
+
+## Why this repository stands out
+
+Many fusion demos stop at running several models and merging the text. Pi Fusion is positioned around scored validation:
+
+- **DRACO full10 tested**: validated on a 10-case DRACO benchmark protocol.
+- **Scorer-only rubric access**: generation used sanitized prompt-only cases; answer/rubric/scoring artifacts were loaded only after generation.
+- **Budget baseline comparison**: published validations exceeded the 64.70 Fusion API budget baseline, with runs at 65.30, 66.40, and 66.20.
+- **0 judge failures in the latest validation**: the latest published validation completed all 10 cases.
+- **Audit-friendly artifacts**: run artifacts, evidence summaries, token usage, and costs are kept locally, while public benchmark summaries stay sanitized.
 
 ## What it does
 
@@ -169,9 +181,11 @@ For project-sized prompts, Pi Fusion copies the current Pi working directory int
 
 Sandbox writes do not modify the real user workspace. After the run, Pi Fusion records each participant's sandbox root, changed files, and ChangeSet artifacts under the run directory so the judge and user can review concrete file-level work instead of relying only on prose.
 
-## Benchmarks
+## DRACO-Verified Benchmark Results
 
-Pi Fusion exceeds the Fusion API budget baseline on the DRACO 10-case benchmark.
+Pi Fusion exceeds the Fusion API budget baseline on scored DRACO full10 validations.
+
+In this repository, **DRACO-verified** means the public benchmark claim is backed by completed DRACO 10-case runs, prompt-only generation, scorer-only rubric access, and sanitized aggregate results. It is not a claim that Pi Fusion beats every Fusion API mode.
 
 We evaluated Pi Fusion on the same 10-case DRACO benchmark protocol used to compare against the Fusion API budget baseline.
 
