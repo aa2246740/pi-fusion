@@ -31,6 +31,7 @@ import {
 import { DEFAULT_MODEL_RETRY_POLICY } from "./src/retry.js";
 import { formatSandboxBashResult, runSandboxedBash } from "./src/bash.js";
 import { extractFocusedExcerpt } from "./src/text-excerpt.js";
+import { formatFusionDisplayResult } from "./src/display.js";
 import {
   editSandboxFile,
   extractLocalFileReferences,
@@ -596,13 +597,6 @@ function createModelCaller(ctx: ExtensionContext, webBackend?: WebBackend): Mode
   };
 }
 
-function formatParticipantLine(p: FusionResult["participants"][number]): string {
-  const index = "slotIndex" in p ? (p as any).slotIndex : 0;
-  const model = "output" in p ? (p as any).output.model : "unknown";
-  const icon = p.state === "success" ? "✓" : p.state === "skipped" ? "⊝" : "✗";
-  return `- P${index + 1} ${icon} ${p.state} ${model}`;
-}
-
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -829,93 +823,9 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.setStatus("pi-fusion", undefined);
       }
 
-      // Format and display Fusion Result
-      const lines: string[] = [
-        `# Pi Fusion Result`,
-        ``,
-        result.finalAnswer,
-        ``,
-        `---`,
-        ``,
-        `## Structured Judge Analysis`,
-        ``,
-        `**Consensus:**`,
-        ...result.judgeAnalysis.consensus.map((c) => `- ${c}`),
-        ``,
-      ];
-
-      if (result.judgeAnalysis.contradictions.length > 0) {
-        lines.push(`**Contradictions:**`);
-        for (const c of result.judgeAnalysis.contradictions) {
-          lines.push(`- ${c.topic}: ${c.stances.map((s) => `P${s.slotIndex + 1} says "${s.stance}"`).join("; ")}`);
-        }
-        lines.push("");
-      }
-
-      if (result.judgeAnalysis.coverageGaps.length > 0) {
-        lines.push(`**Coverage Gaps:**`);
-        for (const g of result.judgeAnalysis.coverageGaps) lines.push(`- ${g}`);
-        lines.push("");
-      }
-
-      if (result.judgeAnalysis.uniqueInsights.length > 0) {
-        lines.push(`**Unique Insights:**`);
-        for (const i of result.judgeAnalysis.uniqueInsights) {
-          lines.push(`- P${i.slotIndex + 1}: ${i.insight}`);
-        }
-        lines.push("");
-      }
-
-      if (result.judgeAnalysis.blindSpots.length > 0) {
-        lines.push(`**Blind Spots:**`);
-        for (const b of result.judgeAnalysis.blindSpots) lines.push(`- ${b}`);
-        lines.push("");
-      }
-
-      if (result.judgeVerification) {
-        lines.push(`## Judge Verification`);
-        lines.push(`Pass: ${result.judgeVerification.pass ? "✓" : "✗"}`);
-        if (result.judgeVerification.unsupportedClaims.length > 0) {
-          lines.push(`Unsupported claims: ${result.judgeVerification.unsupportedClaims.join(", ")}`);
-        }
-        if (result.judgeVerification.remainingCaveats.length > 0) {
-          lines.push(`Caveats: ${result.judgeVerification.remainingCaveats.join(", ")}`);
-        }
-        lines.push("");
-      }
-
-      lines.push(`## Participants`);
-      for (const p of result.participants) lines.push(formatParticipantLine(p));
-
-      if (result.workspace) {
-        lines.push("");
-        lines.push(`## Workspace Sandboxes`);
-        lines.push(`Source: ${result.workspace.sourceRoot}`);
-        lines.push(`Sandbox root: ${result.workspace.root}`);
-        lines.push(`Baseline files: ${result.workspace.fileCount} copied, ${result.workspace.skippedCount} skipped`);
-      }
-
-      lines.push("");
-      lines.push(`## Evidence`);
-      lines.push(`Sources: ${result.evidence.totalEntries}`);
-      if (result.evidence.sources.length > 0) {
-        for (const source of result.evidence.sources.slice(0, 10)) {
-          lines.push(`- [${source.id}] ${source.title ?? source.source}${source.url ? ` — ${source.url}` : ""}`);
-        }
-      }
-
-      lines.push("");
-      lines.push(`## Artifacts`);
-      lines.push(`- Run directory: ${result.artifactsPath}`);
-      if (result.workspace) lines.push(`- Workspace sandboxes: ${result.workspace.root}`);
-
-      lines.push("");
-      lines.push(`---`);
-      lines.push(`Mode: ${result.mode} | Cost: $${result.totalCost.toFixed(4)} | Tokens: ↑${result.totalTokens.input} ↓${result.totalTokens.output}`);
-
       pi.sendMessage({
         customType: "pi-fusion-result",
-        content: lines.join("\n"),
+        content: formatFusionDisplayResult(result),
         display: true,
         details: result,
       });

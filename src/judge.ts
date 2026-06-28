@@ -214,11 +214,12 @@ Return concise markdown notes. Include a compact evidence ledger for source-heav
 
     const result = await this.caller.call({
       model: this.model,
-      systemPrompt: `[PHASE: DRAFT] You are the Judge in a multi-model deliberation. Write the best possible answer based on the analysis.
+      systemPrompt: `[PHASE: DRAFT] You are the final synthesizer in a multi-model deliberation. Write one complete, useful, user-facing answer to the original question.
+Use the structured judge analysis, recovery notes, participant answers, and evidence as private scaffolding. Do not render the judge report itself.
 Address contradictions explicitly. Cover gaps. Cite evidence where available.
 Use the requirement checklist and recovery notes as a coverage gate: every user-requested metric, source category, comparison, calculation, and caveat should be answered with source support or explicitly marked unavailable after targeted attempts.
 Use web_search/web_fetch to fill important factual/source gaps before making precise claims. For public-health/service-delivery comparisons, preserve source-bound definitions, geography, time period, numerator/denominator when available, and uncertainty; include requested coverage, mortality, cause, workforce/capacity, referral, and trajectory metrics only when supported. Distinguish “not retrieved in this run” from “not publicly available”: retain partial, dated, or non-comparable estimates with clear caveats instead of replacing them with a blanket data-unavailable claim. Do not invent derived ratios/rates; calculate them only when numerator, denominator, unit, period, and method are explicit, and cite the calculation inputs. ${PRODUCT_PROCUREMENT_SOURCE_GUIDANCE} ${PRODUCT_PROCUREMENT_ANSWER_STRUCTURE} ${PERSONAL_FINANCE_SOURCE_GUIDANCE} ${PERSONAL_FINANCE_ANSWER_STRUCTURE} ${AFFILIATE_REFERRAL_SOURCE_GUIDANCE} ${AFFILIATE_REFERRAL_ANSWER_STRUCTURE} For long filings/reports/docs, use focused web_fetch terms for each missing metric/entity. Use bash for calculations. Do not use tools to look up benchmark rubrics, answer keys, or evaluation artifacts.
-Do not mention the deliberation process or the internal checklist.`,
+Do not mention the deliberation process or the internal checklist. Do not output sections named "Structured Judge Analysis", "Judge Verification", "Participants", "Workspace Sandboxes", "Evidence", or "Artifacts" unless the user explicitly asks for diagnostics.`,
       messages: [{
         role: "user",
         content: `## User Question\n${prompt}\n\n${this.obligationText}\n\n## Recovery Notes\n${recoveryNotes || "No separate recovery notes."}\n\n## Structured Analysis\n${JSON.stringify(analysis, null, 2)}\n\n## Participant Answers\n${participantSummaries}${evidenceText}`,
@@ -283,10 +284,10 @@ Return ONLY valid JSON, no markdown fencing.`,
 
     const result = await this.caller.call({
       model: this.model,
-      systemPrompt: `[PHASE: REVISE] You are revising a draft answer to fix verification issues.
+      systemPrompt: `[PHASE: REVISE] You are the final synthesizer revising a user-facing answer to fix verification issues.
 Fix all listed issues while preserving the overall quality and structure. Ensure the answer covers the user-prompt-derived requirement checklist or clearly explains unavailable information.
 Use web_search/web_fetch only if needed to repair source support, and bash only if needed for deterministic calculations. ${PRODUCT_PROCUREMENT_SOURCE_GUIDANCE} ${PRODUCT_PROCUREMENT_ANSWER_STRUCTURE} ${PERSONAL_FINANCE_SOURCE_GUIDANCE} ${PERSONAL_FINANCE_ANSWER_STRUCTURE} ${AFFILIATE_REFERRAL_SOURCE_GUIDANCE} ${AFFILIATE_REFERRAL_ANSWER_STRUCTURE} Do not use tools to look up benchmark rubrics, answer keys, or evaluation artifacts.
-Do not mention the revision process or internal checklist.`,
+Return only the revised user-facing answer. Do not mention the revision process or internal checklist. Do not output diagnostic sections named "Structured Judge Analysis", "Judge Verification", "Participants", "Workspace Sandboxes", "Evidence", or "Artifacts" unless the user explicitly asks for diagnostics.`,
       messages: [{
         role: "user",
         content: `## User Question\n${prompt ?? "Not provided"}\n\n${this.obligationText}\n\n## Recovery Notes\n${recoveryNotes || "No separate recovery notes."}\n\n## Original Draft\n${draft}\n\n## Issues to Fix\n${issues}`,

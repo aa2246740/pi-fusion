@@ -114,6 +114,38 @@ describe("JudgeRunner", () => {
     expect(revised).toBe("Revised answer that fixes issues");
   });
 
+  it("treats draft and revise as private-analysis synthesis phases", async () => {
+    const systemPrompts: string[] = [];
+    const caller: ModelCaller = {
+      async call(request) {
+        systemPrompts.push(request.systemPrompt);
+        const answer = request.systemPrompt.includes("[PHASE: REVISE]")
+          ? "Revised user-facing answer"
+          : "Draft user-facing answer";
+        return {
+          answer,
+          model: request.model,
+          tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
+          cost: 0,
+        };
+      },
+    };
+    const judge = new JudgeRunner(caller, "test-model");
+
+    await judge.draft("test prompt", MOCK_ANALYSIS, PARTICIPANTS, EMPTY_EVIDENCE);
+    await judge.revise("draft", MOCK_VERIFICATION_FAIL);
+
+    const combined = systemPrompts.join("\n");
+    expect(combined).toContain("final synthesizer");
+    expect(combined).toContain("private scaffolding");
+    expect(combined).toContain("Do not render the judge report itself");
+    expect(combined).toContain("Return only the revised user-facing answer");
+    expect(combined).toContain("Structured Judge Analysis");
+    expect(combined).toContain("Judge Verification");
+    expect(combined).toContain("Participants");
+    expect(combined).toContain("Artifacts");
+  });
+
   it("runs full quality mode pipeline", async () => {
     const caller = makeFakeCaller({
       analysis: JSON.stringify(MOCK_ANALYSIS),
