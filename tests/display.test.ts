@@ -74,6 +74,7 @@ function makeResult(): FusionResult {
 
 describe("formatFusionDisplayResult", () => {
   it("shows the synthesized answer and keeps judge diagnostics in artifacts/details", () => {
+    delete process.env.PI_FUSION_PRINT_RUN_DIRECTORY;
     const content = formatFusionDisplayResult(makeResult());
 
     expect(content).toContain("SYNTHESIZED FINAL ANSWER");
@@ -90,5 +91,17 @@ describe("formatFusionDisplayResult", () => {
     expect(content).not.toContain("INTERNAL SOURCE TITLE");
     expect(content).not.toContain("https://example.com/internal-source");
     expect(content).not.toContain("/Users/example/private");
+  });
+
+  it("can print a machine-readable run directory for local benchmark automation", () => {
+    const previous = process.env.PI_FUSION_PRINT_RUN_DIRECTORY;
+    process.env.PI_FUSION_PRINT_RUN_DIRECTORY = "1";
+    try {
+      const content = formatFusionDisplayResult(makeResult());
+      expect(content).toContain("Run directory: /Users/example/private/runs/2026-06-29-test");
+    } finally {
+      if (previous === undefined) delete process.env.PI_FUSION_PRINT_RUN_DIRECTORY;
+      else process.env.PI_FUSION_PRINT_RUN_DIRECTORY = previous;
+    }
   });
 });

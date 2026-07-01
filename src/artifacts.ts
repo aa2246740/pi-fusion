@@ -73,6 +73,13 @@ function summarizeWorkspace(summary: ParticipantWorkspaceSummary): Omit<Particip
   return rest;
 }
 
+async function writeRunDirectoryMarker(runDir: string): Promise<void> {
+  const markerPath = process.env.PI_FUSION_RUN_DIRECTORY_FILE;
+  if (!markerPath) return;
+  await fs.mkdir(path.dirname(markerPath), { recursive: true });
+  await fs.writeFile(markerPath, `${runDir}\n`, "utf-8");
+}
+
 export class ArtifactWriter {
   private baseDir: string;
 
@@ -200,6 +207,8 @@ export class ArtifactWriter {
       ),
       "utf-8",
     );
+
+    await writeRunDirectoryMarker(runDir);
 
     return runDir;
   }

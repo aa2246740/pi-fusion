@@ -53,8 +53,10 @@ function makeCaller(responses: Record<string, string> = {}): ModelCaller {
       let key = "participant";
       if (sys.includes("[PHASE: ANALYSIS]")) key = "analysis";
       else if (sys.includes("[PHASE: DRAFT]")) key = "draft";
+      else if (sys.includes("[PHASE: VERIFY_REPAIR]")) key = "repair";
       else if (sys.includes("[PHASE: VERIFY]")) key = "verify";
       else if (sys.includes("[PHASE: REVISE]")) key = "revise";
+      else if (sys.includes("[PHASE: FINAL_HARDEN]")) key = "harden";
 
       const answer = responses[key] ?? `Answer from ${request.model} for ${key}`;
       return {
@@ -196,6 +198,35 @@ describe("FusionEngine", () => {
     expect(events).toContainEqual(expect.objectContaining({ phase: "complete", state: "completed" }));
   });
 
+  it("aborts long model calls with the configured timeout", async () => {
+    const previous = process.env.PI_FUSION_MODEL_CALL_TIMEOUT_MS;
+    process.env.PI_FUSION_MODEL_CALL_TIMEOUT_MS = "20";
+    const caller: ModelCaller = {
+      async call(request) {
+        return await new Promise<ModelCallResult>((_resolve, reject) => {
+          const abort = () => reject(request.signal?.reason ?? new Error("aborted"));
+          if (request.signal?.aborted) abort();
+          request.signal?.addEventListener("abort", abort, { once: true });
+        });
+      },
+    };
+
+    try {
+      const engine = new FusionEngine(caller);
+      const result = await engine.run(makeConfig(), {
+        prompt: "this call hangs",
+        mode: "quality",
+        monitor: false,
+      });
+
+      expect(result.participants.every((status) => status.state === "failed")).toBe(true);
+      expect(result.finalAnswer).toContain("Fusion quorum not met");
+    } finally {
+      if (previous === undefined) delete process.env.PI_FUSION_MODEL_CALL_TIMEOUT_MS;
+      else process.env.PI_FUSION_MODEL_CALL_TIMEOUT_MS = previous;
+    }
+  });
+
   it("includes pre-run local evidence in participant context and the evidence pool", async () => {
     const seenMessages: string[] = [];
     const caller: ModelCaller = {
@@ -268,7 +299,19 @@ describe("FusionEngine", () => {
       analysis: JSON.stringify(ANALYSIS),
       draft: "Drafted answer",
       verify: JSON.stringify(VERIFICATION_FAIL),
+      repair: "Repair notes with exact sourced facts",
       revise: "Revised and improved answer",
+      harden: [
+        "Hardened answer with integrated final gaps",
+        "",
+        "## Verification Gaps Still Needing Review",
+        "",
+        "- Unsupported or weakly supported claim: bad claim",
+        "",
+        "## Final Notes",
+        "",
+        "Keep this user-facing note.",
+      ].join("\n"),
     });
     const engine = new FusionEngine(caller);
     const result = await engine.run(makeConfig(), {
@@ -277,8 +320,12 @@ describe("FusionEngine", () => {
       monitor: false,
     });
 
-    expect(result.finalAnswer).toBe("Revised and improved answer");
+    expect(result.finalAnswer).toContain("Hardened answer with integrated final gaps");
+    expect(result.finalAnswer).toContain("Keep this user-facing note.");
+    expect(result.finalAnswer).not.toContain("Verification Gaps Still Needing Review");
+    expect(result.finalAnswer).not.toContain("Unsupported or weakly supported claim: bad claim");
     expect(result.judgeVerification!.pass).toBe(false);
+    expect(result.judgeRecoveryNotes).toContain("Repair notes with exact sourced facts");
   });
 
   it("runs fast mode fusion (no verify/revise)", async () => {
@@ -376,7 +423,7 @@ describe("FusionEngine", () => {
     expect(result.evidence.totalEntries).toBeGreaterThanOrEqual(0);
   });
 
-  it("passes sandboxed bash to participants and judge by default", async () => {
+  it("passes sandboxed bash to participants and retrieval judge phases only", async () => {
     const seen: Array<{ phase: string; tools?: string[] }> = [];
     const caller: ModelCaller = {
       async call(request) {
@@ -387,7 +434,15 @@ describe("FusionEngine", () => {
                 : "participant";
         seen.push({ phase, tools: request.tools });
         return {
-          answer: phase === "analysis" ? JSON.stringify(ANALYSIS) : "ok",
+          answer: phase === "plan"
+            ? JSON.stringify({
+              obligations: [{
+                id: "o1",
+                kind: "topic",
+                description: "Cover the requested test topic",
+              }],
+            })
+            : phase === "analysis" ? JSON.stringify(ANALYSIS) : "ok",
           model: request.model,
           tokens: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0 },
           cost: 0.01,
@@ -403,7 +458,8 @@ describe("FusionEngine", () => {
 
     expect(seen.filter((entry) => entry.phase === "participant").every((entry) => entry.tools?.includes("bash"))).toBe(true);
     expect(seen.find((entry) => entry.phase === "analysis")?.tools).toContain("bash");
-    expect(seen.find((entry) => entry.phase === "draft")?.tools).toContain("bash");
+    expect(seen.find((entry) => entry.phase === "recover")?.tools).toContain("bash");
+    expect(seen.find((entry) => entry.phase === "draft")?.tools).toBeUndefined();
   });
 
   it("tracks total cost and tokens", async () => {

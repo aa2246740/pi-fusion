@@ -149,12 +149,12 @@
         <div class="shell">
           <div class="section-heading" data-reveal>
             <p class="eyebrow" data-i18n="benchEyebrow">DRACO benchmark</p>
-            <h2 data-i18n="benchHeading">Scored DRACO validation that clears the Fusion API budget baseline.</h2>
-            <p data-i18n="benchIntro">Pi Fusion is not just a demo of multi-model prompting. We tested it on the same DRACO 10-case benchmark protocol used to evaluate Fusion API budget mode: prompt-only generation first, scorer-only rubric access after answers were sealed. Pi Fusion reached 66.40 in full validation and 66.20 in the latest repeat validation, above the 64.70 budget baseline, with all 10 cases completed and no judge failures.</p>
+            <h2 data-i18n="benchHeading">Scored DRACO validation above the reported Fusion API result.</h2>
+            <p data-i18n="benchIntro">Pi Fusion is not just a demo of multi-model prompting. On a sealed fixed DRACO-10 validation run, final answers were generated from prompt-only cases, then the scorer loaded rubric artifacts only after the answers were sealed. Pi Fusion scored 73.80: +4.80 above the reported Fusion API 69.00 headline result and +9.10 above the reported 64.70 budget baseline.</p>
           </div>
           <div class="metric-strip" data-reveal>
-            <div><span class="metric-label" data-i18n="metricPeak">Best DRACO full10</span><strong class="metric-value">66.40</strong></div>
-            <div><span class="metric-label" data-i18n="metricDelta">Delta vs budget</span><strong class="metric-value" data-count-to="1.70">+1.70</strong></div>
+            <div><span class="metric-label" data-i18n="metricPeak">Latest DRACO-10</span><strong class="metric-value">73.80</strong></div>
+            <div><span class="metric-label" data-i18n="metricDelta">Delta vs Fusion API</span><strong class="metric-value" data-count-to="4.80">+4.80</strong></div>
             <div><span class="metric-label" data-i18n="metricFailures">Judge failures</span><strong class="metric-value">0</strong></div>
           </div>
           <div class="benchmark-showcase" data-reveal>
@@ -168,23 +168,22 @@
                 <div role="row"><span role="cell" data-i18n="verifyCasesLabel">Cases</span><strong role="cell" data-i18n="verifyCasesValue">10/10 completed</strong></div>
                 <div role="row"><span role="cell" data-i18n="verifyGenerationLabel">Generation input</span><strong role="cell" data-i18n="verifyGenerationValue">Sanitized prompt-only cases</strong></div>
                 <div role="row"><span role="cell" data-i18n="verifyRubricLabel">Rubric access</span><strong role="cell" data-i18n="verifyRubricValue">Scorer-only after seal</strong></div>
-                <div role="row"><span role="cell" data-i18n="verifyBaselineLabel">Baseline</span><strong role="cell" data-i18n="verifyBaselineValue">Fusion API budget, 64.70</strong></div>
+                <div role="row"><span role="cell" data-i18n="verifyBaselineLabel">Comparison</span><strong role="cell" data-i18n="verifyBaselineValue">Fusion API 69.00 / budget 64.70</strong></div>
                 <div role="row"><span role="cell" data-i18n="verifyArtifactLabel">Public artifacts</span><strong role="cell" data-i18n="verifyArtifactValue">Sanitized aggregates only</strong></div>
               </div>
             </div>
           </div>
           <div class="table-wrap" data-reveal>
             <table>
-              <thead><tr><th data-i18n="tableSystem">System / run</th><th>full10 score</th><th data-i18n="tableDelta">Δ vs Fusion API budget</th></tr></thead>
+              <thead><tr><th data-i18n="tableSystem">System / run</th><th>DRACO score</th><th data-i18n="tableDelta">Δ vs reported Fusion API</th><th data-i18n="tableBudgetDelta">Δ vs reported budget</th></tr></thead>
               <tbody>
-                <tr><td data-i18n="rowBudget">Fusion API budget baseline</td><td>64.70</td><td>—</td></tr>
-                <tr><td data-i18n="rowKept">Pi Fusion kept validation</td><td>65.30</td><td>+0.60</td></tr>
-                <tr><td data-i18n="rowBest">Pi Fusion best validation</td><td>66.40</td><td>+1.70</td></tr>
-                <tr><td data-i18n="rowLatest">Pi Fusion latest validation</td><td>66.20</td><td>+1.50</td></tr>
+                <tr><td data-i18n="rowLatest">Pi Fusion latest sealed DRACO-10 validation</td><td><strong>73.80</strong></td><td><strong>+4.80</strong></td><td><strong>+9.10</strong></td></tr>
+                <tr><td data-i18n="rowFusion">Reported Fusion API headline result</td><td>69.00</td><td>—</td><td>+4.30</td></tr>
+                <tr><td data-i18n="rowBudget">Reported Fusion API budget baseline</td><td>64.70</td><td>-4.30</td><td>—</td></tr>
               </tbody>
             </table>
           </div>
-          <p class="footnote" data-reveal data-i18n="benchFootnote">DRACO-verified here means completed scored runs under this protocol. It is not a claim that Pi Fusion beats every Fusion API mode. Generation used sanitized prompt-only case files; answer/rubric/scoring artifacts were available only to the post-generation scorer.</p>
+          <p class="footnote" data-reveal data-i18n="benchFootnote">DRACO-verified here means completed scored runs under this fixed 10-case validation protocol. It is not official DRACO certification or a claim that Pi Fusion beats every Fusion API mode on every evaluation. Generation used sanitized prompt-only case files; answer/rubric/scoring artifacts were available only to the post-generation scorer.</p>
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import type { EvidenceEntry, FusionObligation, ObligationPlan } from "./types.js";
 import { extractFocusedExcerpt } from "./text-excerpt.js";
+import { secHtmlTablesToMarkdown, secHtmlToReadableText } from "./web.js";
 
 export interface SecSeedOptions {
   maxFilings?: number;
@@ -30,7 +31,11 @@ interface SecDateTarget {
   form?: "10-Q" | "10-K";
 }
 
-const DEFAULT_USER_AGENT = "Pi Fusion evidence seeding contact: local-user";
+const DEFAULT_USER_AGENT = "Pi-Fusion/0.1 (https://github.com/aa2246740/pi-fusion; aa2246740@users.noreply.github.com)";
+
+function defaultUserAgent(): string {
+  return process.env.PI_FUSION_SEC_USER_AGENT?.trim() || DEFAULT_USER_AGENT;
+}
 
 function stableHash(input: string): string {
   let hash = 2166136261;
@@ -191,31 +196,21 @@ function decodeXml(value: string): string {
     .trim();
 }
 
-function htmlToReadableText(value: string): string {
-  return decodeXml(String(value ?? "")
-    .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
-    .replace(/<br\s*\/?\s*>/gi, "\n")
-    .replace(/<\/(?:tr|p|div|table|thead|tbody|tfoot|h[1-6])>/gi, "\n")
-    .replace(/<\/(?:td|th)>/gi, " | ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\r/g, "\n"))
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 function reportScore(name: string, focus: string): number {
   const text = `${name}\n${focus}`.toLowerCase();
   const report = name.toLowerCase();
   let score = 0;
+  if (/condensed consolidated statements? of operations|consolidated statements? of operations/.test(report)) score += 16;
+  if (/statements? of changes in (shareholders'? )?equity/.test(report)) score += 14;
   if (/segment|reportable segment/.test(report)) score += 12;
+  if (/segment reporting.*tables?/.test(report)) score += 18;
   if (/debt|loan|credit|borrowing|mortgage|note payable/.test(report)) score += 12;
+  if (/summary of consolidated indebtedness|unsecured notes payable|unsecured line of credit|term loan|scheduled principal repayments/.test(report)) score += 18;
   if (/impair|held for sale|fair value/.test(report)) score += 10;
+  if (/nonrecurring basis|assets? held for sale|property dispositions?|reduced holding period|shortened holding period/.test(report)) score += 20;
   if (/acquisition|business combination|purchase|consolidation/.test(report)) score += 10;
   if (/equity|stockholder|common share|atm|forward sale/.test(report)) score += 8;
+  if (/shareholders'? equity.*additional information|noncontrolling interests/.test(report)) score += 16;
   if (/revenue|operating income|income statement|operations/.test(report)) score += 7;
   if (/real estate|property|portfolio|investment management/.test(report)) score += 6;
   for (const token of focus.toLowerCase().split(/[^a-z0-9]+/).filter((part) => part.length >= 5)) {
@@ -224,6 +219,25 @@ function reportScore(name: string, focus: string): number {
   if (/additional information/.test(report) && !/summary/.test(report)) score -= 4;
   if (/parenthetical|document and entity|cover|signature|exhibit|calculation of filing fee/i.test(report)) score -= 8;
   return score;
+}
+
+function buildSecEvidenceContent(
+  html: string,
+  focus: string,
+  options: { maxChars: number; windowChars: number; maxSnippets: number; maxTables: number; maxTableChars: number },
+): string {
+  const tables = secHtmlTablesToMarkdown(html, options.maxTables)?.slice(0, options.maxTableChars);
+  const readableText = secHtmlToReadableText(html);
+  const excerpt = extractFocusedExcerpt(readableText, focus, {
+    maxChars: options.maxChars,
+    windowChars: options.windowChars,
+    maxSnippets: options.maxSnippets,
+  });
+
+  if (tables && excerpt.trim()) {
+    return `${tables}\n\nFocused SEC text excerpts:\n${excerpt}`;
+  }
+  return tables || excerpt;
 }
 
 function secDateTargets(prompt: string, obligations?: ObligationPlan): SecDateTarget[] {
@@ -372,8 +386,8 @@ export async function seedSecEvidenceFromPrompt(
 
   const maxFilings = options.maxFilings ?? 8;
   const maxCharsPerFiling = options.maxCharsPerFiling ?? 16_000;
-  const maxReportFiles = options.maxReportFiles ?? 20;
-  const userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+  const maxReportFiles = options.maxReportFiles ?? 24;
+  const userAgent = options.userAgent ?? defaultUserAgent();
 
   const entries = await fetchJson<Record<string, CompanyTickerEntry>>(
     "https://www.sec.gov/files/company_tickers.json",
@@ -410,11 +424,12 @@ export async function seedSecEvidenceFromPrompt(
   for (const filing of filings) {
     try {
       const text = await fetchText(filing.url, options.signal, userAgent);
-      const readableText = htmlToReadableText(text);
-      const excerpt = extractFocusedExcerpt(readableText, focus, {
+      const excerpt = buildSecEvidenceContent(text, focus, {
         maxChars: maxCharsPerFiling,
         windowChars: 1_600,
         maxSnippets: 10,
+        maxTables: 12,
+        maxTableChars: 48_000,
       });
       evidence.push({
         id: `sec-filing-${stableHash(filing.url)}`,
@@ -431,16 +446,17 @@ export async function seedSecEvidenceFromPrompt(
         try {
           const baseUrl = filing.url.slice(0, filing.url.lastIndexOf("/") + 1);
           const summaryXml = await fetchText(`${baseUrl}FilingSummary.xml`, options.signal, userAgent);
-          const reports = parseFilingSummaryReports(summaryXml, focus, Math.min(4, maxReportFiles - reportFilesAdded));
+          const reports = parseFilingSummaryReports(summaryXml, focus, Math.min(6, maxReportFiles - reportFilesAdded));
           for (const report of reports) {
             const reportUrl = `${baseUrl}${report.htmlFileName}`;
             const reportText = await fetchText(reportUrl, options.signal, userAgent);
-            const readableReportText = htmlToReadableText(reportText);
             const reportFocus = `${focus}; ${report.shortName}; ${report.longName}`;
-            const reportExcerpt = extractFocusedExcerpt(readableReportText, reportFocus, {
+            const reportExcerpt = buildSecEvidenceContent(reportText, reportFocus, {
               maxChars: 12_000,
               windowChars: 1_000,
               maxSnippets: 6,
+              maxTables: 6,
+              maxTableChars: 24_000,
             });
             evidence.push({
               id: `sec-report-${stableHash(reportUrl)}`,

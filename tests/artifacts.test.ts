@@ -42,6 +42,7 @@ describe("ArtifactWriter", () => {
   });
 
   afterEach(async () => {
+    delete process.env.PI_FUSION_RUN_DIRECTORY_FILE;
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
@@ -80,6 +81,18 @@ describe("ArtifactWriter", () => {
     const path1 = await writer.write(MOCK_RESULT);
     const path2 = await writer.write(MOCK_RESULT);
     expect(path1).not.toBe(path2);
+  });
+
+  it("writes a run directory marker file when requested", async () => {
+    const markerPath = path.join(tmpDir, "markers", "case.txt");
+    process.env.PI_FUSION_RUN_DIRECTORY_FILE = markerPath;
+
+    const writer = new ArtifactWriter(tmpDir);
+    const artifactsPath = await writer.write(MOCK_RESULT);
+
+    const marker = await fs.readFile(markerPath, "utf-8");
+    expect(marker.trim()).toBe(artifactsPath);
+    await expect(fs.stat(path.join(marker.trim(), "final-answer.md"))).resolves.toBeTruthy();
   });
 
   it("includes error info for failed participants", async () => {

@@ -2,6 +2,7 @@ import { execFile as execFileCallback } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { createJiti } from "jiti";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -258,10 +259,19 @@ function stableHashForWeb(input: string): string {
 
 const execFile = promisify(execFileCallback);
 const DIRECT_PDF_USER_AGENT = "Pi Fusion evidence PDF fetch contact: local-user";
-const DIRECT_SEC_USER_AGENT = "Pi Fusion evidence SEC fetch contact: local-user";
+const DIRECT_SEC_USER_AGENT = process.env.PI_FUSION_SEC_USER_AGENT?.trim()
+  || "Pi-Fusion/0.1 (https://github.com/aa2246740/pi-fusion; aa2246740@users.noreply.github.com)";
 
 function decodeSecHtmlEntities(value: string): string {
   return value
+    .replace(/&#x([0-9a-f]+);/gi, (_match, hex: string) => {
+      const codePoint = Number.parseInt(hex, 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : "";
+    })
+    .replace(/&#(\d+);/g, (_match, decimal: string) => {
+      const codePoint = Number.parseInt(decimal, 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : "";
+    })
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -284,6 +294,180 @@ export function secHtmlToReadableText(value: string): string {
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+const SEC_HTML_TABLE_NEEDLES = [
+  "The following tables set forth certain segment information",
+  "Summary of Segment Information",
+  "Segment Reporting",
+  "REIT Portfolio",
+  "Investment Management",
+  "Operating Income",
+  "Three Months Ended September 30",
+  "Increase (Decrease)",
+  "Results of Operations",
+  "Management's Discussion",
+  "Management’s Discussion",
+  "same-property",
+  "same store",
+  "same-property NOI",
+  "Net Operating Income",
+  "Summary of Consolidated Indebtedness",
+  "consolidated indebtedness",
+  "incremental delayed-draw term loan",
+  "delayed-draw term loan",
+  "delayed draw term loan",
+  "Unsecured Term Loans",
+  "SOFR + 1.20",
+  "SOFR+1.20",
+  "SOFR +",
+  "basis points",
+  "May 29, 2030",
+  "principal paydown",
+  "mortgages payable",
+  "interest rate as of",
+  "maturity date as of",
+  "property mortgage",
+  "mortgage modification",
+  "reduce the interest rate",
+  "Schedule of Rental Revenue",
+  "rental revenue",
+  "Schedule of Acquisitions and Conversions",
+  "acquisition",
+  "Renaissance Portfolio",
+  "consolidation loss",
+  "ATM Program",
+  "at-the-market",
+  "Equity Activity",
+  "forward sale",
+  "physically settled",
+  "ATM Forward Sale Agreements",
+  "Aggregate Value",
+  "Average Net Share Price",
+  "aggregate net value",
+  "gross proceeds",
+  "net proceeds",
+  "Common Shares and Units",
+  "common shares",
+  "Fund Capital",
+  "Financing and Debt",
+  "Financial Instruments and Fair Value Measurements",
+  "nonrecurring basis",
+  "Total 2025 Impairment Charges",
+  "Acadia's Share",
+  "Acadia’s Share",
+  "Reduced holding period",
+  "shortened hold period",
+  "650 Bald Hill Road",
+  "640 Broadway",
+  "Fund IV Other Portfolio",
+  "impairment",
+];
+
+function cleanSecHtmlTableCell(cellHtml: string): string {
+  return secHtmlToReadableText(cellHtml)
+    .replace(/\s*\|\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeSecHtmlTableCells(cells: string[]): string[] {
+  const normalized: string[] = [];
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i]?.replace(/^\(\s+/, "(").replace(/\s+\)$/, ")").trim();
+    if (!cell || cell === "$") continue;
+    if (cell === "(" && cells[i + 1] && cells[i + 2] === ")") {
+      normalized.push(`(${cells[i + 1].trim()})`);
+      i += 2;
+      continue;
+    }
+    if (cell === ")" && normalized.length > 0) {
+      const previous = normalized.pop() ?? "";
+      normalized.push(`(${previous.replace(/^\(\s*/, "").replace(/\)?$/, "").trim()})`);
+      continue;
+    }
+    normalized.push(cell);
+  }
+  return normalized;
+}
+
+function secHtmlTableToMarkdown(tableHtml: string): string | undefined {
+  const rows = [...tableHtml.matchAll(/<tr\b[\s\S]*?<\/tr>/gi)]
+    .map((rowMatch) => {
+      const cells = [...rowMatch[0].matchAll(/<(?:td|th)\b[\s\S]*?<\/(?:td|th)>/gi)]
+        .map((cellMatch) => cleanSecHtmlTableCell(cellMatch[0]));
+      return normalizeSecHtmlTableCells(cells);
+    })
+    .filter((row) => row.length > 0);
+
+  if (rows.length < 2) return undefined;
+  const markdown = rows
+    .slice(0, 40)
+    .map((row) => `| ${row.join(" | ")} |`)
+    .join("\n");
+  return markdown.length > 80 ? markdown : undefined;
+}
+
+interface SecHtmlTableCandidate {
+  start: number;
+  end: number;
+  html: string;
+}
+
+function secHtmlTableDistanceToNeedle(table: SecHtmlTableCandidate, needleIndex: number): number {
+  if (needleIndex >= table.start && needleIndex <= table.end) return 0;
+  if (needleIndex < table.start) return table.start - needleIndex;
+  return needleIndex - table.end;
+}
+
+function rankedSecHtmlTablesNearNeedle(
+  tableCandidates: SecHtmlTableCandidate[],
+  needleIndex: number,
+  maxDistance = 45_000,
+): SecHtmlTableCandidate[] {
+  return tableCandidates
+    .map((table) => ({ table, distance: secHtmlTableDistanceToNeedle(table, needleIndex) }))
+    .filter(({ distance }) => distance <= maxDistance)
+    .sort((a, b) => a.distance - b.distance)
+    .map(({ table }) => table);
+}
+
+export function secHtmlTablesToMarkdown(html: string, maxTables = 10): string | undefined {
+  if (!html.trim() || !/<table\b/i.test(html)) return undefined;
+  const lower = html.toLowerCase();
+  const tableCandidates: SecHtmlTableCandidate[] = [...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)]
+    .map((match) => ({
+      start: match.index ?? 0,
+      end: (match.index ?? 0) + match[0].length,
+      html: match[0],
+    }));
+  const seenTableStarts = new Set<number>();
+  const tables: string[] = [];
+
+  for (const needle of SEC_HTML_TABLE_NEEDLES) {
+    let from = 0;
+    const lowerNeedle = needle.toLowerCase();
+    while (tables.length < maxTables) {
+      const index = lower.indexOf(lowerNeedle, from);
+      if (index < 0) break;
+      from = index + lowerNeedle.length;
+      let tablesForNeedle = 0;
+      for (const table of rankedSecHtmlTablesNearNeedle(tableCandidates, index)) {
+        if (seenTableStarts.has(table.start)) continue;
+        const markdown = secHtmlTableToMarkdown(table.html);
+        if (!markdown) continue;
+        seenTableStarts.add(table.start);
+        tables.push(`SEC HTML table near "${needle}":\n${markdown}`);
+        tablesForNeedle++;
+        if (tables.length >= maxTables || tablesForNeedle >= 2) break;
+      }
+      if (tablesForNeedle > 0) break;
+    }
+    if (tables.length >= maxTables) break;
+  }
+
+  if (!tables.length) return undefined;
+  return `Extracted SEC HTML tables:\n\n${tables.join("\n\n")}`.slice(0, 140_000);
 }
 
 export function isSecInteractiveReportUrl(value: string): boolean {
@@ -434,7 +618,35 @@ function searchResultQualityScore(result: WebSearchResult): number {
 }
 
 export function rankSearchResults(results: WebSearchResult[]): WebSearchResult[] {
-  return [...results].sort((a, b) => searchResultQualityScore(b) - searchResultQualityScore(a));
+  return [...results]
+    .filter((result) => !isLikelySearchNoise(result))
+    .sort((a, b) => searchResultQualityScore(b) - searchResultQualityScore(a));
+}
+
+function isLikelySearchNoise(result: WebSearchResult): boolean {
+  const title = String(result.title ?? "").trim();
+  const url = String(result.url ?? "").trim();
+  const snippet = String(result.snippet ?? "").trim();
+  const combined = `${title}\n${url}\n${snippet}`;
+  const lowerUrl = url.toLowerCase();
+
+  if (/^Apple Safari$/i.test(title) && /apple\.com\/support\/safari\/?$/i.test(url)) return true;
+  if (/^Safari\b/i.test(title) && /apple\.com\/support\/safari/i.test(url) && !queryLooksPublicHealth(snippet)) return true;
+  if (/please enable javascript|enable javascript|開啟 Safari|偏好設定|啟用 JavaScript/i.test(combined)
+    && /apple\.com\/support\/safari/i.test(url)) return true;
+  if (/^Microsoft Edge$/i.test(title) && /support\.microsoft\.com\/[^/]+\/microsoft-edge/i.test(url)) return true;
+  if (/^Google Chrome$/i.test(title) && /support\.google\.com\/chrome/i.test(url)) return true;
+  if (/^(?:Mozilla\s+)?Firefox\b/i.test(title) && /support\.mozilla\.org/i.test(url)) return true;
+  if (/support\.mozilla\.org\/(?:[^/]+\/)?kb\/javascript-settings-for-interactive-web-pages/i.test(url)) return true;
+  if (/javascript settings|preferences for interactive web pages/i.test(combined) && /support\.mozilla\.org/i.test(url)) return true;
+  if (/^Opera$/i.test(title) && /help\.opera\.com\/latest\/web-preferences/i.test(url)) return true;
+  if (/help\.opera\.com\/latest\/web-preferences/i.test(url)) return true;
+  if (/google\.[^/]+\/search\b/i.test(url) && /啟用 JavaScript|enable javascript|javascript/i.test(combined)) return true;
+  if (/^Browser support$/i.test(title) && /(support\.microsoft\.com|support\.google\.com|support\.mozilla\.org|apple\.com\/support)/i.test(url)) return true;
+  if (/(enable|turn on|allow) javascript|browser settings|update your browser|unsupported browser/i.test(combined)
+    && /(support\.microsoft\.com\/[^/]+\/microsoft-edge|support\.google\.com\/chrome|support\.mozilla\.org|help\.opera\.com\/latest\/web-preferences|apple\.com\/support\/safari)/i.test(lowerUrl)) return true;
+
+  return false;
 }
 
 function queryLooksPublicHealth(query: string): boolean {
@@ -477,7 +689,7 @@ function queryRelevanceScore(result: WebSearchResult, terms: string[]): number {
 
 export function rankSearchResultsForQuery(results: WebSearchResult[], query: string): WebSearchResult[] {
   const terms = queryTerms(query);
-  return [...results].sort((a, b) => {
+  return [...results].filter((result) => !isLikelySearchNoise(result)).sort((a, b) => {
     const aQuality = queryContextQualityScore(a, query);
     const bQuality = queryContextQualityScore(b, query);
     const delta = (queryRelevanceScore(b, terms) + bQuality) - (queryRelevanceScore(a, terms) + aQuality);
@@ -486,6 +698,8 @@ export function rankSearchResultsForQuery(results: WebSearchResult[], query: str
 }
 
 export function parseSearchResultsFromMcpText(text: string, maxResults = 5): WebSearchResult[] {
+  if (isLikelySearchFailureText(text)) return [];
+
   const provider = parseProvider(text);
   const payload = parseJsonPayload(text);
 
@@ -501,14 +715,16 @@ export function parseSearchResultsFromMcpText(text: string, maxResults = 5): Web
     if (organic) {
       return rankSearchResults(organic
         .map((item) => normalizeSearchItem(item, provider))
-        .filter((item): item is WebSearchResult => Boolean(item)))
+        .filter((item): item is WebSearchResult => Boolean(item))
+        .filter((item) => !isLikelySearchNoise(item)))
         .slice(0, maxResults);
     }
   }
 
   const trimmed = text.trim();
   if (!trimmed) return [];
-  return [{ title: "Search result", snippet: trimmed.slice(0, 4000), provider }];
+  const fallback = { title: "Search result", snippet: trimmed.slice(0, 4000), provider };
+  return isLikelySearchNoise(fallback) ? [] : [fallback];
 }
 
 export function parseFetchResultFromMcpText(text: string, requestedUrl: string): WebFetchResult {
@@ -711,8 +927,8 @@ export async function discoverMcpWebBackend(
 
   const search = searchCandidates[0];
   const fetch = fetchCandidates[0];
-  const isUnifiedSearch = search.server.serverName === "unified-search";
   const statusTool = search.server.tools.includes("search_provider_status") ? "search_provider_status" : undefined;
+  const fetchFallback: WebFetchFallback = await existingHardenedScraperEntry() ? "hardened_scraper" : "off";
   const config: McpWebBackendConfig = {
     type: "mcp",
     serverName: search.server.serverName,
@@ -720,9 +936,8 @@ export async function discoverMcpWebBackend(
     searchTool: search.tool,
     fetchServerName: fetch.server.serverName,
     fetchTool: fetch.tool,
-    fetchFallback: "off",
+    fetchFallback,
     ...(statusTool ? { statusTool } : {}),
-    ...(isUnifiedSearch ? { searchStrategy: "prefer_minimax" as const } : {}),
     maxResults: DEFAULT_MCP_WEB_BACKEND.maxResults,
     configPaths,
   };
@@ -747,6 +962,73 @@ interface HardenedScraperTool {
     params: Record<string, unknown>,
     signal: AbortSignal,
   ) => Promise<HardenedScraperToolResult>;
+}
+
+interface ExecFileError extends Error {
+  stdout?: string | Buffer;
+  stderr?: string | Buffer;
+  code?: string | number | null;
+  signal?: string | null;
+}
+
+const HARDENED_SCRAPER_CHILD_MARKER = "__PI_FUSION_HARDENED_SCRAPER_RESULT__";
+
+const HARDENED_SCRAPER_CHILD_SCRIPT = `
+(async () => {
+  const marker = ${JSON.stringify(HARDENED_SCRAPER_CHILD_MARKER)};
+  const payload = JSON.parse(Buffer.from(process.argv[1], "base64").toString("utf8"));
+  try {
+    const { createRequire } = await import("node:module");
+    const requireFromPiFusion = createRequire(payload.referrer);
+    const requireFromScraper = createRequire(payload.entry);
+    let createJiti;
+    try {
+      ({ createJiti } = requireFromPiFusion("jiti"));
+    } catch {
+      ({ createJiti } = requireFromScraper("jiti"));
+    }
+    const jiti = createJiti(payload.referrer, { moduleCache: false });
+    const mod = await jiti.import(payload.entry);
+    const tool = mod.webScrapeTool ?? (typeof mod.createWebScrapeTool === "function" ? mod.createWebScrapeTool() : undefined);
+    if (!tool || typeof tool.execute !== "function") {
+      throw new Error("pi-scraper-hardened web_scrape tool not found");
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), payload.timeoutMs);
+    try {
+      const result = await tool.execute(payload.toolCallId, payload.params, controller.signal);
+      process.stdout.write("\\n" + marker + JSON.stringify({ ok: true, result }) + "\\n");
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    process.stdout.write("\\n" + marker + JSON.stringify({ ok: false, error: { message, stack } }) + "\\n");
+  }
+})();
+`;
+
+function piFusionPackageRoot(): string {
+  try {
+    return fileURLToPath(new URL("..", import.meta.url));
+  } catch {
+    return process.cwd();
+  }
+}
+
+function parseHardenedScraperChildResult(stdout: string): { ok: true; result: HardenedScraperToolResult } | { ok: false; error: { message?: string; stack?: string } } {
+  const markerIndex = stdout.lastIndexOf(HARDENED_SCRAPER_CHILD_MARKER);
+  if (markerIndex < 0) {
+    throw new Error(`hardened scraper child produced no structured result${stdout.trim() ? `: ${stdout.trim().slice(0, 500)}` : ""}`);
+  }
+  const jsonText = stdout.slice(markerIndex + HARDENED_SCRAPER_CHILD_MARKER.length).trim().split(/\r?\n/, 1)[0];
+  const parsed = JSON.parse(jsonText) as { ok?: unknown; result?: unknown; error?: unknown };
+  if (parsed.ok === true) {
+    return { ok: true, result: parsed.result as HardenedScraperToolResult };
+  }
+  const error = parsed.error && typeof parsed.error === "object" ? parsed.error as { message?: string; stack?: string } : {};
+  return { ok: false, error };
 }
 
 function defaultHardenedScraperPaths(): string[] {
@@ -793,8 +1075,181 @@ function textFromToolResult(result: HardenedScraperToolResult): string {
 function isLikelyFetchFailureText(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed) return true;
-  return /^(fetch failed|scrape failed|web_fetch error|error:|\{\s*"error"\s*:)/i.test(trimmed) ||
-    /\b(quota exceeded|insufficient quota|insufficient balance|rate limit|unauthorized|forbidden)\b/i.test(trimmed.slice(0, 1000));
+  return /^(fetch failed|scrape failed|web_fetch error|mcp error\s*-\d+|error:|\{\s*"error"\s*:)/i.test(trimmed) ||
+    /\b(quota exceeded|insufficient quota|insufficient balance|rate limit|unauthorized|forbidden|please enter the correct url format|undeclared automated tool|declare your traffic)\b/i.test(trimmed.slice(0, 1600));
+}
+
+function isLikelyFetchFailureResult(result: WebFetchResult): boolean {
+  const title = result.title ?? "";
+  const url = result.url ?? "";
+  const text = result.text ?? "";
+  const head = `${title}\n${text.slice(0, 1200)}`;
+  if (isLikelyFetchFailureText(text)) return true;
+  if (/help\.opera\.com\/latest\/web-preferences/i.test(url)) return true;
+  if (/google\.[^/]+\/search\b/i.test(url) && /啟用 JavaScript|enable javascript|javascript/i.test(head)) return true;
+  if (/\b(page not found|http 404|404\s*\[\s*not found\s*\]|not found \|)\b/i.test(title)) return true;
+  if (/^\s*(page not found|http 404|404\s*\[\s*not found\s*\])/i.test(text)) return true;
+  if (/something might be broken|the page you are looking for doesn'?t exist/i.test(head)) return true;
+  if (/Hello PrivilegedAccessController|reCAPTCHA|checking your browser|正在检查.*浏览器/i.test(head)) return true;
+  return false;
+}
+
+function isLikelySearchFailureText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  const head = trimmed.slice(0, 1200);
+  return /^(search failed|web_search error|error:|\{\s*"error"\s*:)/i.test(head) ||
+    /\b(mcp error|api error|failed to perform search|all search providers failed|not configured|quota exceeded|insufficient quota|insufficient balance|rate limit|unauthorized|forbidden|usage limit|token plan)\b/i.test(head) ||
+    /已达到.*(?:用量|使用)上限|用量上限|使用上限|每周\/每月使用上限|套餐|购买积分|API Error:\s*\d+|MCP error\s*-\d+/i.test(head);
+}
+
+function hardenedScraperMaxCharsForUrl(url: string): number {
+  try {
+    const parsed = new URL(url);
+    const isSec = /(^|\.)sec\.gov$/i.test(parsed.hostname);
+    if (isSec && /\/Archives\/edgar\/data\/\d+\/\d+\/[a-z0-9_-]+-\d{8}\.html?$/i.test(parsed.pathname)) return 250_000;
+    if (isSec && /\/ix\b/i.test(parsed.pathname)) return 250_000;
+    if (isSec && /\/cgi-bin\/viewer\b/i.test(parsed.pathname)) return 100_000;
+  } catch {
+    // Fall through to the default cap for non-URL inputs.
+  }
+  return 25_000;
+}
+
+function hardenedScraperTimeoutSecondsForUrl(url: string): number {
+  try {
+    const parsed = new URL(url);
+    const isSec = /(^|\.)sec\.gov$/i.test(parsed.hostname);
+    if (isSec && /\/Archives\/edgar\/data\/\d+\/\d+\/[a-z0-9_-]+-\d{8}\.html?$/i.test(parsed.pathname)) return 75;
+    if (isSec && /\/ix\b/i.test(parsed.pathname)) return 75;
+  } catch {
+    // Fall through to the default timeout for non-URL inputs.
+  }
+  return 45;
+}
+
+function hardenedScraperModeForUrl(url: string): "auto" | "fast" {
+  try {
+    const parsed = new URL(url);
+    const isSec = /(^|\.)sec\.gov$/i.test(parsed.hostname);
+    if (isSec && /\/Archives\/edgar\/data\/\d+\/\d+\/[a-z0-9_-]+-\d{8}\.html?$/i.test(parsed.pathname)) return "fast";
+    if (isSec && /\/ix\b/i.test(parsed.pathname)) return "fast";
+  } catch {
+    // Fall through to the default mode for non-URL inputs.
+  }
+  return "auto";
+}
+
+function hardenedScraperRespectRobotsForUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const isSec = /(^|\.)sec\.gov$/i.test(parsed.hostname);
+    if (isSec && /\/Archives\/edgar\/data\/\d+\/\d+\/[a-z0-9_-]+-\d{8}\.html?$/i.test(parsed.pathname)) return false;
+    if (isSec && /\/ix\b/i.test(parsed.pathname)) return false;
+  } catch {
+    // Fall through to the default policy for non-URL inputs.
+  }
+  return true;
+}
+
+function hardenedScraperLineNeedlesForUrl(url: string): string[] | undefined {
+  try {
+    const parsed = new URL(url);
+    const isSec = /(^|\.)sec\.gov$/i.test(parsed.hostname);
+    if (!isSec) return undefined;
+    if (!(/\/Archives\/edgar\/data\/\d+\/\d+\/[a-z0-9_-]+-\d{8}\.html?$/i.test(parsed.pathname)
+      || /\/ix\b/i.test(parsed.pathname)
+      || /\/cgi-bin\/viewer\b/i.test(parsed.pathname))) {
+      return undefined;
+    }
+    return [
+      "Segment Reporting",
+      "Summary of Segment Information",
+      "Core Portfolio",
+      "Funds",
+      "Total revenues",
+      "Operating income",
+      "Investment Management",
+      "REIT Portfolio",
+      "Rental Revenue",
+      "Three Months Ended September 30",
+      "Increase (Decrease)",
+      "same-property NOI",
+      "Results of Operations",
+      "Management's Discussion",
+      "term loan",
+      "principal paydown",
+      "mortgages payable",
+      "mortgage indebtedness",
+      "SOFR +",
+      "basis points",
+      "interest rate as of",
+      "maturity date as of",
+      "impairment",
+      "Fund III",
+      "Fund IV",
+      "Bald Hill",
+      "Renaissance Portfolio",
+      "equity issuance",
+      "ATM Program",
+      "forward sale agreements",
+      "physically settled",
+      "ATM Forward Sale Agreements",
+      "Aggregate Value",
+      "Average Net Share Price",
+      "aggregate net value",
+      "Form 10-K",
+      "Risk Factors",
+      "geographic",
+      "Washington, D.C.",
+      "New York",
+    ];
+  } catch {
+    return undefined;
+  }
+}
+
+function hardenedScraperLineContextForUrl(url: string): number | undefined {
+  return hardenedScraperLineNeedlesForUrl(url) ? 40 : undefined;
+}
+
+function isLikelyMachineExtractLine(text: string): boolean {
+  if (text.length < 500) return false;
+  if (/(?:us-gaap|dei|srt|country|iso4217|xbrli|akr):/i.test(text)) return true;
+  if (/http:\/\/fasb\.org|http:\/\/www\.xbrl\.org|0000899629/i.test(text)) return true;
+  const denseTokenCount = (text.match(/[A-Za-z0-9_:-]{40,}/g) ?? []).length;
+  return denseTokenCount >= 4;
+}
+
+function textFromLineMatches(matches: unknown): string | undefined {
+  if (!Array.isArray(matches) || matches.length === 0) return undefined;
+  const lines: string[] = ["Matching line snippets:"];
+  const seen = new Set<string>();
+  for (const match of matches.slice(0, 120)) {
+    if (!match || typeof match !== "object") continue;
+    const record = match as Record<string, unknown>;
+    const needle = typeof record.needle === "string" ? record.needle : "match";
+    const line = typeof record.line === "number" ? record.line : undefined;
+    const block: string[] = [`- needle "${needle}"${line ? ` at line ${line}` : ""}`];
+    const appendContext = (prefix: string, context: unknown) => {
+      if (!context || typeof context !== "object") return;
+      const item = context as Record<string, unknown>;
+      const itemLine = typeof item.line === "number" ? item.line : undefined;
+      const text = typeof item.text === "string" ? item.text.replace(/\s+/g, " ").trim() : "";
+      if (!text) return;
+      if (isLikelyMachineExtractLine(text)) return;
+      const key = `${itemLine ?? ""}:${text}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      block.push(`${prefix} ${itemLine ? `${itemLine}: ` : ""}${text.slice(0, 800)}`);
+    };
+    for (const context of Array.isArray(record.contextBefore) ? record.contextBefore : []) appendContext(" ", context);
+    appendContext(">", record);
+    for (const context of Array.isArray(record.contextAfter) ? record.contextAfter : []) appendContext(" ", context);
+    lines.push(block.join("\n"));
+  }
+  const text = lines.join("\n").trim();
+  return text.length > 80 ? text : undefined;
 }
 
 export class McpWebBackend implements WebBackend {
@@ -858,24 +1313,65 @@ export class McpWebBackend implements WebBackend {
   }
 
   private async fetchWithHardenedScraper(url: string, options: { signal?: AbortSignal } = {}, primaryError?: unknown): Promise<WebFetchResult> {
-    const tool = await this.loadHardenedScraperTool();
-    const controller = new AbortController();
-    const signal = options.signal ?? controller.signal;
-    const result = await tool.execute(
-      `pi-fusion-fetch-${stableHashForWeb(url)}`,
-      {
+    const status = await this.hardenedScraperStatus();
+    if (!status.ok || !status.entry) throw new Error(status.message);
+    const maxChars = hardenedScraperMaxCharsForUrl(url);
+    const timeoutSeconds = hardenedScraperTimeoutSecondsForUrl(url);
+    const mode = hardenedScraperModeForUrl(url);
+    const respectRobots = hardenedScraperRespectRobotsForUrl(url);
+    const lineNeedles = hardenedScraperLineNeedlesForUrl(url);
+
+    const payload = Buffer.from(JSON.stringify({
+      entry: status.entry,
+      referrer: import.meta.url,
+      toolCallId: `pi-fusion-fetch-${stableHashForWeb(url)}`,
+      timeoutMs: timeoutSeconds * 1000,
+      params: {
         url,
-        mode: "auto",
+        mode,
         format: "markdown",
-        timeoutSeconds: 45,
-        maxChars: 25_000,
+        timeoutSeconds,
+        maxChars,
         onlyMainContent: true,
+        respectRobots,
+        ...(lineNeedles ? { linesMatching: lineNeedles, contextLines: hardenedScraperLineContextForUrl(url) ?? 8 } : {}),
       },
-      signal,
-    );
+    }), "utf8").toString("base64");
+    let stdout = "";
+    let stderr = "";
+    try {
+      const output = await execFile(process.execPath, ["-e", HARDENED_SCRAPER_CHILD_SCRIPT, payload], {
+        cwd: piFusionPackageRoot(),
+        timeout: timeoutSeconds * 1000 + 10_000,
+        maxBuffer: 32 * 1024 * 1024,
+        signal: options.signal,
+      });
+      stdout = output.stdout;
+      stderr = output.stderr;
+    } catch (error) {
+      const execError = error as ExecFileError;
+      stdout = typeof execError.stdout === "string" ? execError.stdout : execError.stdout?.toString("utf8") ?? "";
+      stderr = typeof execError.stderr === "string" ? execError.stderr : execError.stderr?.toString("utf8") ?? "";
+      const message = execError.message || "hardened scraper child process failed";
+      throw new Error(`hardened scraper fetch failed in isolated child: ${message}${stderr.trim() ? `; stderr: ${stderr.trim().slice(0, 500)}` : ""}`);
+    }
+    const child = parseHardenedScraperChildResult(stdout);
+    if (!child.ok) {
+      throw new Error(`hardened scraper fetch failed: ${child.error.message ?? "unknown child error"}${stderr.trim() ? `; stderr: ${stderr.trim().slice(0, 500)}` : ""}`);
+    }
+    const result = child.result;
     const details = result.details ?? {};
     const data = details.data && typeof details.data === "object" ? details.data as Record<string, unknown> : {};
-    const text = typeof data.markdown === "string"
+    const secTableText = lineNeedles && typeof data.html === "string"
+      ? secHtmlTablesToMarkdown(data.html)
+      : undefined;
+    const lineMatchText = textFromLineMatches(data.matches);
+    const tableAndLineText = [secTableText, lineMatchText ? `SEC line snippets:\n${lineMatchText}` : undefined]
+      .filter((part): part is string => Boolean(part && part.trim()))
+      .join("\n\n");
+    const text = tableAndLineText.trim()
+      ? tableAndLineText
+      : typeof data.markdown === "string"
       ? data.markdown
       : typeof data.text === "string"
         ? data.text
@@ -890,19 +1386,24 @@ export class McpWebBackend implements WebBackend {
       throw new Error(`hardened scraper fetch failed: ${typeof error === "string" ? error : text.slice(0, 500)}`);
     }
 
-    return {
+    const fetched: WebFetchResult = {
       url: typeof details.finalUrl === "string" ? details.finalUrl : typeof details.url === "string" ? details.url : url,
       title: typeof data.title === "string" ? data.title : undefined,
       text,
       metadata: {
         fallback: "hardened_scraper",
-        entry: this.hardenedScraperEntry,
+        entry: status.entry,
+        isolation: "child_process",
         mode: typeof details.mode === "string" ? details.mode : undefined,
         responseId: typeof details.responseId === "string" ? details.responseId : undefined,
         primaryError: primaryError instanceof Error ? primaryError.message : primaryError ? String(primaryError) : undefined,
       },
       raw: result,
     };
+    if (isLikelyFetchFailureResult(fetched)) {
+      throw new Error(`hardened scraper fetch returned failure page: ${fetched.title ?? fetched.text.slice(0, 120)}`);
+    }
+    return fetched;
   }
 
   private async connectServer(serverName: string): Promise<ConnectedMcpServer> {
@@ -1046,10 +1547,14 @@ export class McpWebBackend implements WebBackend {
     }
 
     const connection = await this.connectServer(this.searchServerName);
-    const result = await connection.client.callTool({ name: searchTool, arguments: args });
+    const result = await connection.client.callTool(
+      { name: searchTool, arguments: args },
+      undefined,
+      { signal: options.signal },
+    );
     const text = extractMcpText(result);
 
-    if (/all search providers failed/i.test(text) || /not configured/i.test(text)) {
+    if (isLikelySearchFailureText(text)) {
       throw new Error(text.trim().slice(0, 1000));
     }
 
@@ -1088,22 +1593,30 @@ export class McpWebBackend implements WebBackend {
       this.config.fetchTool = fetchTool;
 
       const connection = await this.connectServer(this.fetchServerName);
-      const result = await connection.client.callTool({
-        name: fetchTool,
-        arguments: {
-          url: trimmedUrl,
-          timeout: 30,
-          return_format: "markdown",
-          with_links_summary: false,
-          with_images_summary: false,
+      const result = await connection.client.callTool(
+        {
+          name: fetchTool,
+          arguments: {
+            url: trimmedUrl,
+            timeout: 30,
+            return_format: "markdown",
+            with_links_summary: false,
+            with_images_summary: false,
+          },
         },
-      });
+        undefined,
+        { signal: options.signal },
+      );
       const text = extractMcpText(result);
       const fetched = parseFetchResultFromMcpText(text, trimmedUrl);
-      if (isLikelyFetchFailureText(fetched.text)) {
+      if (isLikelyFetchFailureResult(fetched)) {
         throw new Error(fetched.text.slice(0, 1000));
       }
-      return await appendDataUnhcrAttachedPdfText(fetched, trimmedUrl, options.signal);
+      const augmented = await appendDataUnhcrAttachedPdfText(fetched, trimmedUrl, options.signal);
+      if (isLikelyFetchFailureResult(augmented)) {
+        throw new Error(augmented.text.slice(0, 1000));
+      }
+      return augmented;
     } catch (error) {
       primaryError = primaryError ?? error;
       if (this.fetchFallback === "hardened_scraper") {

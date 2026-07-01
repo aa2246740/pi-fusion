@@ -2,11 +2,11 @@
 
 Pi Fusion 是给 Pi agents 用的通用 model-fusion layer。它的开源定位重点是有评分验证：DRACO full10 runs、prompt-only generation、scorer-only rubric access，以及 sanitized aggregate results。
 
-Pi Fusion 在 scored DRACO full10 validations 上超过 Fusion API budget baseline。
+Pi Fusion 在 sealed fixed DRACO-10 validation run 上拿到 **73.80**。这比 reported Fusion API headline result **69.00** 高 **+4.80**，比 reported Fusion API budget baseline **64.70** 高 **+9.10**。
 
-本文里的 **DRACO verified** 指的是公开 claim 有完整 10-case DRACO benchmark runs 和 generation 之后的 scoring 支撑。它不表示 Pi Fusion 得到了 DRACO 官方认证，也不是说 Pi Fusion 超过所有 Fusion API modes。
+本文里的 **DRACO verified** 指的是公开 claim 有完整 10-case DRACO benchmark runs 和 generation 之后的 scoring 支撑。它不表示 Pi Fusion 得到了 DRACO 官方认证，也不是说 Pi Fusion 在所有评估里超过所有 Fusion API modes。
 
-我们在同一个用于对比 Fusion API budget baseline 的 10-case DRACO benchmark protocol 上评估了 Pi Fusion。
+我们在固定 10-case DRACO validation protocol 上评估了 Pi Fusion。Final answers sealed 之后，scorer 才加载 rubric 和 scoring artifacts。
 
 ## Scoring 录屏
 
@@ -18,12 +18,11 @@ Pi Fusion 在 scored DRACO full10 validations 上超过 Fusion API budget baseli
 
 ## Validation summary
 
-| System / run | full10 score | 相对 Fusion API budget |
-| --- | ---: | ---: |
-| Fusion API budget baseline | 64.70 | - |
-| Pi Fusion kept validation | 65.30 | +0.60 |
-| Pi Fusion best validation | 66.40 | +1.70 |
-| Pi Fusion latest validation | 66.20 | +1.50 |
+| System / run | DRACO score | 相对 reported Fusion API | 相对 reported budget |
+| --- | ---: | ---: | ---: |
+| Pi Fusion latest sealed DRACO-10 validation | **73.80** | **+4.80** | **+9.10** |
+| Reported Fusion API headline result | 69.00 | - | +4.30 |
+| Reported Fusion API budget baseline | 64.70 | -4.30 | - |
 
 Latest validation 完成了全部 10 个 cases，judge failures 为 0。
 
@@ -45,7 +44,7 @@ Generation 使用 sanitized prompt-only cases。Scoring 只发生在 generation 
 ## Methodology
 
 - 10 个 sanitized prompt-only DRACO-style cases
-- 固定顺序的 3 个 OpenAI Codex participants
+- 固定 4-participant quality panel
 - GPT-5.5 judge/scorer
 - generation 阶段不读取 answers 或 private scoring criteria
 - generation 结束后才 scoring
@@ -53,15 +52,13 @@ Generation 使用 sanitized prompt-only cases。Scoring 只发生在 generation 
 
 ## Sanitized runs
 
-| Run | full10 score | Budget baseline | Delta vs baseline | Cases completed | Judge failures | Public status |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| 129 | 65.30 | 64.70 | +0.60 | 10/10 | 0 | kept |
-| 175 | 66.40 | 64.70 | +1.70 | 10/10 | 0 | validation |
-| 200 | 66.20 | 64.70 | +1.50 | 10/10 | 0 | validation |
+| Run | DRACO score | Reported Fusion API | 相对 Fusion API | Budget baseline | 相对 budget | Cases completed | Judge failures | Public status |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 2026-07-01 sealed DRACO-10 | **73.80** | 69.00 | **+4.80** | 64.70 | **+9.10** | 10/10 | 0 | latest |
 
 ## Interpretation
 
-这些结果说明，在 sanitized full10 validations 上，Pi Fusion 的 fusion pattern 超过了 64.70 的 Fusion API budget baseline。它们是对 model-fusion approach 的证据，不是说 Pi Fusion 整体超过 Fusion API，也不是说它超过所有 Fusion API modes。
+这个结果说明，在 sealed fixed DRACO-10 validation subset 上，Pi Fusion 的 fusion pattern 超过了 reported 69.00 Fusion API headline result 和 64.70 Fusion API budget baseline。它是对 model-fusion approach 的证据，不是说 Pi Fusion 整体超过 Fusion API，也不是说它在所有评估里超过所有 Fusion API modes。
 
 关键差异在于：Pi Fusion 不是一个没有评分的 multi-model prompt demo。它的 benchmark claim 绑定固定 protocol、完成的 full10 runs，以及 generation sealed 之后才发生的 scoring。
 

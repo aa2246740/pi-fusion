@@ -8,34 +8,32 @@
   },
   "methodology": {
     "cases": 10,
-    "participants": "fixed 3 OpenAI Codex participants in order",
+    "participants": "fixed 4-participant quality panel",
     "judge": "GPT-5.5 judge/scorer"
   },
+  "reportedFusionApi": 69,
   "budgetTarget": 64.7,
   "runs": [
     {
-      "run": 129,
-      "full10Score": 65.3,
-      "deltaVsBudgetTarget": 0.6,
+      "run": "2026-07-01 sealed DRACO-10",
+      "full10Score": 73.8,
+      "deltaVsReportedFusionApi": 4.8,
+      "deltaVsBudgetTarget": 9.1,
       "casesCompleted": 10,
       "judgeFailures": 0,
-      "publicStatus": "kept"
-    },
-    {
-      "run": 175,
-      "full10Score": 66.4,
-      "deltaVsBudgetTarget": 1.7,
-      "casesCompleted": 10,
-      "judgeFailures": 0,
-      "publicStatus": "validation"
-    },
-    {
-      "run": 200,
-      "full10Score": 66.2,
-      "deltaVsBudgetTarget": 1.5,
-      "casesCompleted": 10,
-      "judgeFailures": 0,
-      "publicStatus": "validation"
+      "publicStatus": "latest",
+      "domainScores": {
+        "Academic": 62.97,
+        "Finance": 85.11,
+        "Shopping/Product Comparison": 60.63,
+        "Technology": 82.3,
+        "Personalized Assistant": 81.99,
+        "Medicine": 84.46,
+        "General Knowledge": 68.73,
+        "UX Design": 63.23,
+        "Needle in a Haystack": 77.79,
+        "Law": 70.78
+      }
     }
   ]
 }

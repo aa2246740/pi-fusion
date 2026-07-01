@@ -19,6 +19,7 @@ import { ParticipantRunner } from "./participant.js";
 import { JudgeRunner } from "./judge.js";
 import { EvidenceCollector } from "./evidence.js";
 import { ObligationPlanner, formatObligationPlanForModel } from "./obligations.js";
+import { seedPromptSearchEvidence } from "./prompt-search-seeding.js";
 import { seedSecEvidenceFromPrompt } from "./sec-seeding.js";
 import { seedUxSourceCatalog } from "./ux-source-catalog.js";
 import { FallbackResolver } from "./fallback.js";
@@ -72,6 +73,73 @@ export interface FusionProgressEvent {
 }
 
 const FUSION_QUORUM_ERROR = "Fusion quorum not met: fewer than 2 Participant Runs succeeded. Returning the only successful participant's raw answer (not a judged Fusion Result).";
+const DEFAULT_MODEL_CALL_TIMEOUT_MS = 20 * 60 * 1000;
+const VERIFICATION_REVIEW_HEADER = "Verification Gaps Still Needing Review";
+const INTERNAL_FINAL_SECTION_PATTERNS = [
+  new RegExp(`^#{1,3}\\s+${VERIFICATION_REVIEW_HEADER}\\b.*$`, "im"),
+  /^#{1,3}\s+Verification Gaps\b.*$/im,
+  /^#{1,3}\s+Internal Fusion Requirement Checklist\b.*$/im,
+  /^#{1,3}\s+Judge Verification\b.*$/im,
+  /^#{1,3}\s+Structured Judge Analysis\b.*$/im,
+  /^#{1,3}\s+Participants\b.*$/im,
+  /^#{1,3}\s+Workspace Sandboxes\b.*$/im,
+  /^#{1,3}\s+Artifacts\b.*$/im,
+];
+
+function getModelCallTimeoutMs(): number {
+  const raw = process.env.PI_FUSION_MODEL_CALL_TIMEOUT_MS;
+  if (!raw) return DEFAULT_MODEL_CALL_TIMEOUT_MS;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_MODEL_CALL_TIMEOUT_MS;
+  return Math.max(0, Math.floor(parsed));
+}
+
+function withModelCallTimeout(caller: ModelCaller, timeoutMs: number): ModelCaller {
+  if (timeoutMs <= 0) return caller;
+  return {
+    async call(request) {
+      const controller = new AbortController();
+      const parentSignal = request.signal;
+      const onParentAbort = () => {
+        controller.abort(parentSignal?.reason ?? new Error("Model call aborted by parent signal"));
+      };
+      if (parentSignal?.aborted) onParentAbort();
+      else parentSignal?.addEventListener("abort", onParentAbort, { once: true });
+
+      const timer = setTimeout(() => {
+        controller.abort(new Error(`Model call timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        return await caller.call({ ...request, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+        parentSignal?.removeEventListener("abort", onParentAbort);
+      }
+    },
+  };
+}
+
+function stripMarkdownSection(answer: string, headingPattern: RegExp): string {
+  const match = headingPattern.exec(answer);
+  if (!match || match.index === undefined) return answer;
+
+  const start = match.index;
+  const bodyStart = start + match[0].length;
+  const nextHeadingOffset = answer.slice(bodyStart).search(/\n#{1,2}\s+\S/);
+  const end = nextHeadingOffset === -1 ? answer.length : bodyStart + nextHeadingOffset;
+  const prefix = answer.slice(0, start).trimEnd();
+  const suffix = answer.slice(end).trimStart();
+  return [prefix, suffix].filter(Boolean).join("\n\n").trim();
+}
+
+function sanitizeFinalAnswerForUser(answer: string): string {
+  let sanitized = answer;
+  for (const pattern of INTERNAL_FINAL_SECTION_PATTERNS) {
+    sanitized = stripMarkdownSection(sanitized, pattern);
+  }
+  return sanitized.trim();
+}
 
 interface WorkspaceRunState {
   baseline: WorkspaceBaseline;
@@ -104,10 +172,11 @@ export class FusionEngine {
     const evidence = new EvidenceCollector();
     for (const entry of input.initialEvidence ?? []) evidence.add(entry);
     const retryPolicy = normalizeRetryPolicy(config.retryPolicy ?? DEFAULT_MODEL_RETRY_POLICY);
+    const timedCaller = withModelCallTimeout(this.caller, getModelCallTimeoutMs());
     const retryingCaller: ModelCaller = {
-      call: (request) => callModelWithRetry(this.caller, request, retryPolicy),
+      call: (request) => callModelWithRetry(timedCaller, request, retryPolicy),
     };
-    const participantRunner = new ParticipantRunner(this.caller, config.defaultFallbacks, retryPolicy);
+    const participantRunner = new ParticipantRunner(timedCaller, config.defaultFallbacks, retryPolicy);
     emitProgress({ phase: "preparing", state: "started", message: "Preparing tools and run context" });
     const toolNames = await this.prepareTools(config);
     emitProgress({ phase: "preparing", state: "completed", message: `Prepared tools: ${toolNames.length > 0 ? toolNames.join(", ") : "none"}` });
@@ -140,12 +209,28 @@ export class FusionEngine {
       const seeded = await seedSecEvidenceFromPrompt(input.prompt, obligationPlan, { signal: undefined });
       for (const entry of seeded) evidence.add(entry);
       emitProgress({ phase: "evidence", state: "progress", message: seeded.length > 0 ? `Seeded ${seeded.length} SEC evidence entries` : "No SEC seed evidence needed" });
-    } catch {
+    } catch (error) {
       // SEC seeding is best-effort. Models can still use web tools.
-      emitProgress({ phase: "evidence", state: "failed", message: "SEC seed evidence skipped; continuing" });
+      const detail = error instanceof Error ? error.message : String(error);
+      emitProgress({ phase: "evidence", state: "failed", message: `SEC seed evidence skipped: ${detail}` });
     }
     const uxSeeded = seedUxSourceCatalog(input.prompt);
     for (const entry of uxSeeded) evidence.add(entry);
+    emitProgress({ phase: "evidence", state: "progress", message: "Collecting prompt-targeted web evidence" });
+    try {
+      const promptSearchSeeded = await seedPromptSearchEvidence(input.prompt, obligationPlan, this.deps.webBackend);
+      for (const entry of promptSearchSeeded) evidence.add(entry);
+      emitProgress({
+        phase: "evidence",
+        state: "progress",
+        message: promptSearchSeeded.length > 0
+          ? `Seeded ${promptSearchSeeded.length} prompt-targeted web evidence entries`
+          : "No prompt-targeted web evidence seeded",
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      emitProgress({ phase: "evidence", state: "failed", message: `Prompt-targeted web evidence skipped: ${detail}` });
+    }
     emitProgress({
       phase: "evidence",
       state: "completed",
@@ -303,17 +388,84 @@ export class FusionEngine {
           emitProgress({ phase: "judging", state: "progress", message: "Judge drafting final answer", judgeModel });
           finalAnswer = await judgeRunner.draft(input.prompt, analysis, successfulParticipants, evidencePool, judgeRecoveryNotes);
         } else {
-          // Quality mode: analysis → recovery → draft → verify → revise
+          // Quality mode: analysis → recovery → draft → verify → repair/revise
+          // Re-verify after revision so artifacts and the run summary describe
+          // the actual user-facing answer, not only the first draft.
           emitProgress({ phase: "judging", state: "progress", message: "Judge drafting final answer", judgeModel });
-          const draft = await judgeRunner.draft(input.prompt, analysis, successfulParticipants, evidencePool, judgeRecoveryNotes);
-          emitProgress({ phase: "judging", state: "progress", message: "Judge verifying draft", judgeModel });
-          verification = await judgeRunner.verify(draft, analysis, evidencePool, judgeRecoveryNotes);
+          let currentDraft = await judgeRunner.draft(input.prompt, analysis, successfulParticipants, evidencePool, judgeRecoveryNotes);
+          let revisedAfterLastVerification = false;
+          const maxVerificationRepairRounds = 2;
 
-          if (verification.pass) {
-            finalAnswer = draft;
-          } else {
-            emitProgress({ phase: "judging", state: "progress", message: "Judge revising draft after verification", judgeModel });
-            finalAnswer = await judgeRunner.revise(draft, verification, input.prompt, evidencePool, judgeRecoveryNotes);
+          for (let round = 1; round <= maxVerificationRepairRounds; round++) {
+            emitProgress({
+              phase: "judging",
+              state: "progress",
+              message: round === 1 ? "Judge verifying draft" : "Judge verifying revised answer",
+              judgeModel,
+            });
+            verification = await judgeRunner.verify(currentDraft, analysis, evidencePool, judgeRecoveryNotes, successfulParticipants);
+            revisedAfterLastVerification = false;
+
+            if (verification.pass) {
+              finalAnswer = currentDraft;
+              break;
+            }
+
+            emitProgress({
+              phase: "judging",
+              state: "progress",
+              message: round === 1 ? "Judge repairing verification issues" : "Judge repairing remaining verification issues",
+              judgeModel,
+            });
+            const verificationRepairNotes = await judgeRunner.repairVerificationIssues(
+              currentDraft,
+              verification,
+              input.prompt,
+              analysis,
+              successfulParticipants,
+              evidencePool,
+              judgeRecoveryNotes,
+            );
+            const combinedRecoveryNotes = [judgeRecoveryNotes, verificationRepairNotes]
+              .filter((notes) => notes?.trim())
+              .join("\n\n## Verification Repair Notes\n\n");
+            emitProgress({
+              phase: "judging",
+              state: "progress",
+              message: round === 1 ? "Judge revising draft after verification" : "Judge revising answer after remaining issues",
+              judgeModel,
+            });
+            currentDraft = await judgeRunner.revise(
+              currentDraft,
+              verification,
+              input.prompt,
+              evidencePool,
+              combinedRecoveryNotes,
+              analysis,
+              successfulParticipants,
+            );
+            judgeRecoveryNotes = combinedRecoveryNotes;
+            finalAnswer = currentDraft;
+            revisedAfterLastVerification = true;
+          }
+
+          if (revisedAfterLastVerification && finalAnswer !== undefined) {
+            emitProgress({ phase: "judging", state: "progress", message: "Judge verifying final revised answer", judgeModel });
+            verification = await judgeRunner.verify(finalAnswer, analysis, evidencePool, judgeRecoveryNotes, successfulParticipants);
+            if (!verification.pass) {
+              emitProgress({ phase: "judging", state: "progress", message: "Judge hardening final answer from verification gaps", judgeModel });
+              finalAnswer = await judgeRunner.hardenWithVerificationIssues(
+                finalAnswer,
+                verification,
+                input.prompt,
+                evidencePool,
+                judgeRecoveryNotes,
+                analysis,
+                successfulParticipants,
+              );
+              emitProgress({ phase: "judging", state: "progress", message: "Judge verifying hardened final answer", judgeModel });
+              verification = await judgeRunner.verify(finalAnswer, analysis, evidencePool, judgeRecoveryNotes, successfulParticipants);
+            }
           }
         }
         emitProgress({ phase: "judging", state: "completed", message: `Judge completed with ${judgeModel}`, judgeModel });
@@ -331,6 +483,8 @@ export class FusionEngine {
     if (!analysis || finalAnswer === undefined) {
       throw lastJudgeError instanceof Error ? lastJudgeError : new Error(String(lastJudgeError ?? "All judge models failed"));
     }
+
+    finalAnswer = sanitizeFinalAnswerForUser(finalAnswer);
 
     // Phase 5: Build result
     const allOutputs = [...successfulParticipants];

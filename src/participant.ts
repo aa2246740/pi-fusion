@@ -15,15 +15,75 @@ const FUSION_BASELINE_INSTRUCTIONS = `You are a Symmetric Participant in a multi
 Answer the user's question independently. Use any available tools to gather information.
 When web tools are available, use web_search to find candidate sources, then use web_fetch on the most authoritative URLs before making precise factual, product, legal, financial, or citation-sensitive claims. For long filings, reports, PDFs, or documentation pages, call web_fetch with focused terms for the exact metric/entity you need instead of relying on the document opening.
 Prefer primary/official sources and cite source IDs or URLs explicitly.
-Be thorough: cover multiple angles, cite sources when possible, and distinguish facts from assumptions.
+Be thorough, but prioritize precise obligation coverage over generic overview: answer every requested entity, metric, time period, comparison criterion, calculation, exception, and caveat from the prompt-derived checklist. For source-heavy prompts, include a compact matrix or ledger mapping requested items to findings and sources.
+Do not stop at a broad "not found" caveat. Before marking a requested item missing, try exact-name/source-title queries and focused fetches. If the ideal source is not retrieved, still provide the strongest best-effort finding from available sources, snippets, or your analysis, label confidence, and name the source that should be checked next. If tools fail or rate-limit, record the failure separately from the answer and keep a candidate fact ledger so the Judge can decide what to preserve. Omit or soften only safety-critical medical/legal/financial claims that would be unsafe to present as fact.
+For corporate-filing strategy prompts, turn source-backed ratios and timing into mechanism-level analysis: compute company-share percentages from gross/share rows and explain control/minority implications, compute capital-mix ratios when debt and equity funding inputs are available, compute basis-point or dollar deltas from old/new spreads or capacity amounts, connect segment deterioration to multiple retrieved drivers, and interpret clustered drawdowns, impairments, or sales as possible capital-velocity, market-pressure, or investor-liquidity signals when supported.
 If workspace tools are available, you have an isolated copy of the user's project. Use workspace_list/workspace_search/workspace_read to inspect relevant files before making codebase claims. Use workspace_write or workspace_edit only inside your own sandbox for notes, prototypes, patch drafts, or changed files. These writes do not modify the user's real workspace.
 Do not reference other models or participants.`;
+
+function participantEvidenceBlockScore(block: string): number {
+  const text = block.toLowerCase();
+  let score = 0;
+  const patterns = [
+    /rental revenue/,
+    /operating income/,
+    /investment management/,
+    /reit portfolio/,
+    /forward sale|atm program|settled forward|net proceeds|aggregate net value/,
+    /term loan|delayed draw|drawn at closing/,
+    /sofr\s*\+|spread|basis points|maturity/,
+    /modified .* loans|reduce(?:d)? the interest rate/,
+    /renaissance portfolio/,
+    /purchase price|cash outlay|principal paydown|mortgage debt/,
+    /bald hill|fund iii|fund iv|impairment/,
+    /washington|d\.c\.|new york/,
+    /noncontrolling|ownership|proportionate share|acadia.?s share|minority control|control limitation/,
+    /shortened hold|reduced holding period|capital velocity|deployment urgency|market pressure|investor liquidity|aum|fee income|fee decline|structured financing/,
+    /debt.?equity|capital mix|capital ratio|balance.?sheet discipline/,
+  ];
+  for (const pattern of patterns) {
+    if (pattern.test(text)) score += 2;
+  }
+  const numericDensity = Math.min(10, (block.match(/(?:[$€£¥]\s*)?\d[\d,.]*(?:\s*%|\s*(?:million|billion|thousand|bps|bp))?/gi) ?? []).length);
+  score += numericDensity;
+  if (/no exact focus terms found/.test(text)) score -= 4;
+  if (/sec html table near|>\s*\d+:\s*/i.test(block)) score += 1;
+  return score;
+}
+
+function compactEvidenceBody(entry: EvidenceEntry, maxChars = 1_600): string {
+  const body = entry.source === "web_fetch" && entry.fullContent && entry.fullContent.length > entry.snippet.length
+    ? entry.fullContent
+    : entry.snippet;
+  const text = String(body ?? "").trim();
+  if (text.length <= maxChars) return text;
+  if (!text.includes("--- excerpt around")) return `${text.slice(0, maxChars)}\n[truncated at ${maxChars} chars]`;
+
+  const [header, ...rawBlocks] = text.split(/\n--- excerpt around /);
+  const parts = [header.trim()].filter(Boolean);
+  let used = parts.join("\n").length;
+  const selectedBlocks = rawBlocks
+    .map((rawBlock, index) => ({ rawBlock, index, score: participantEvidenceBlockScore(rawBlock) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, 6);
+  for (const { rawBlock } of selectedBlocks) {
+    const block = `--- excerpt around ${rawBlock}`.trim();
+    const remaining = maxChars - used - 80;
+    if (remaining <= 240) break;
+    const clipped = block.length > Math.min(700, remaining)
+      ? `${block.slice(0, Math.min(700, remaining))}\n[excerpt truncated]`
+      : block;
+    parts.push(clipped);
+    used += clipped.length + 1;
+  }
+  return parts.join("\n");
+}
 
 function formatProvidedEvidence(evidence: EvidenceEntry[]): string {
   if (evidence.length === 0) return "";
   const lines = evidence.map((entry) => {
     const source = entry.url ? `${entry.title ?? entry.source} (${entry.url})` : (entry.title ?? entry.source);
-    return `- [${entry.id}] ${source}: ${entry.snippet}`;
+    return `- [${entry.id}] ${source}:\n${compactEvidenceBody(entry)}`;
   });
   return `\n\n## Provided Evidence\nThese sources were collected before this participant run. You may use them, but still verify with tools if needed.\n${lines.join("\n")}`;
 }

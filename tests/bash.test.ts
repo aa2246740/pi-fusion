@@ -3,9 +3,9 @@ import { formatSandboxBashResult, runSandboxedBash, validateSandboxBashCommand }
 
 describe("sandboxed bash", () => {
   it("allows deterministic calculations", async () => {
-    const result = await runSandboxedBash("python3 - <<'PY'\nprint(117.9 + 50.0)\nPY");
+    const result = await runSandboxedBash("python3 - <<'PY'\nprint(12.3 + 4.5)\nPY");
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.trim()).toBe("167.9");
+    expect(result.stdout.trim()).toBe("16.8");
   });
 
   it("rejects network commands", () => {

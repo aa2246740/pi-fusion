@@ -1035,7 +1035,7 @@ export default function (pi: ExtensionAPI) {
             fetchFallback: fallback,
             hardenedScraperPath: existing?.hardenedScraperPath,
             ...(existing?.searchProvider ? { searchProvider: existing.searchProvider } : {}),
-            ...(existing?.searchStrategy ? { searchStrategy: existing.searchStrategy } : isUnifiedSearch ? { searchStrategy: "prefer_minimax" as const } : {}),
+            ...(existing?.searchStrategy ? { searchStrategy: existing.searchStrategy } : {}),
             ...(existing?.statusTool ? { statusTool: existing.statusTool } : isUnifiedSearch ? { statusTool: "search_provider_status" } : {}),
             maxResults: existing?.maxResults ?? DEFAULT_MCP_WEB_BACKEND.maxResults,
           },

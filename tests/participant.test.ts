@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { ParticipantRunner } from "../src/participant.js";
-import type { ModelCaller, ModelCallResult, FusionErrorType } from "../src/types.js";
+import type { ModelCaller, ModelCallResult, FusionErrorType, EvidenceEntry } from "../src/types.js";
 
 function fakeCaller(answer: string, model?: string): ModelCaller {
   return {
@@ -38,6 +38,50 @@ describe("ParticipantRunner", () => {
     expect(output.slotIndex).toBe(0);
     expect(output.error).toBeUndefined();
     expect(output.tokens.input).toBe(100);
+  });
+
+  it("keeps high-signal focused evidence blocks in participant context", async () => {
+    let promptSeen = "";
+    const caller: ModelCaller = {
+      async call(request) {
+        promptSeen = request.messages.map((message) => message.content).join("\n");
+        return {
+          answer: "Participant answer",
+          model: request.model,
+          tokens: { input: 50, output: 100, cacheRead: 0, cacheWrite: 0 },
+          cost: 0,
+        };
+      },
+    };
+    const lowSignalBlocks = Array.from({ length: 8 }, (_, index) => [
+      `--- excerpt around "Renaissance Portfolio" at char ${index * 100}-${index * 100 + 50} ---`,
+      `Generic Renaissance Portfolio mention ${index}; no exact rate, spread, maturity, or table value appears here.`,
+    ].join("\n")).join("\n");
+    const highSignalBlock = [
+      '--- excerpt around "modified property mortgage loans" at char 9000-9400 ---',
+      "The venture modified the property mortgage loans to reduce the interest rate to SOFR + 1.85% and disclosed the maturity and spread change.",
+    ].join("\n");
+    const evidence: EvidenceEntry = {
+      id: "web-finance",
+      source: "web_fetch",
+      title: "Synthetic SEC focused excerpts",
+      url: "https://example.com/filing",
+      snippet: "short snippet",
+      fullContent: `[focused excerpts]\n${lowSignalBlocks}\n${highSignalBlock}`,
+      participantSlotIndex: -1,
+      fetchedAt: 1,
+    };
+
+    const runner = new ParticipantRunner(caller);
+    await runner.run(
+      { model: "openai/gpt-4.1" },
+      "Analyze the financing terms.",
+      [],
+      [evidence],
+    );
+
+    expect(promptSeen).toContain("SOFR + 1.85%");
+    expect(promptSeen).toContain("modified the property mortgage loans");
   });
 
   it("uses fallback on objective failure", async () => {

@@ -20,7 +20,8 @@ Many fusion demos stop at running several models and merging the text. Pi Fusion
 | --- | --- | --- |
 | DRACO full10 tested | 10-case benchmark protocol completed | The project is evaluated, not just demonstrated |
 | Scorer-only rubric access | Rubric loads only after generation is sealed | The generator does not see private scoring criteria |
-| Budget baseline comparison | 65.30, 66.40, and 66.20 vs 64.70 | The claim is tied to a named baseline |
+| Fusion API comparison | 73.80 vs reported Fusion API 69.00 | The claim is tied to a named benchmark result |
+| Budget baseline comparison | 73.80 vs reported Fusion API budget 64.70 | Shows a +9.10 margin over the budget baseline |
 | Latest validation stability | 10/10 cases, 0 judge failures | The run completed the full protocol |
 | Local artifact trail | Answers, evidence summaries, tokens, and costs stay local | Users can inspect what happened |
 
@@ -185,15 +186,15 @@ Sandbox writes do not modify the real user workspace. After the run, Pi Fusion r
 
 ## DRACO-Verified Benchmark Results
 
-Pi Fusion exceeds the Fusion API budget baseline on scored DRACO full10 validations.
+Pi Fusion scored **73.80** on a sealed fixed DRACO-10 validation run, **+4.80 points above the reported Fusion API 69.00 result** and **+9.10 points above the reported Fusion API budget 64.70 baseline**.
 
-In this repository, **DRACO-verified** means the public benchmark claim is backed by completed DRACO 10-case runs, prompt-only generation, scorer-only rubric access, and sanitized aggregate results. It is not a claim that Pi Fusion beats every Fusion API mode.
+In this repository, **DRACO-verified** means the public benchmark claim is backed by completed DRACO 10-case runs, prompt-only generation, scorer-only rubric access, and sanitized aggregate results. It is not an official DRACO certification or a claim that Pi Fusion beats every Fusion API mode on every evaluation.
 
 [![Pi Fusion DRACO scorer recording](https://raw.githubusercontent.com/aa2246740/pi-fusion/main/docs/assets/draco-scored-validation-preview.gif)](https://github.com/aa2246740/pi-fusion/raw/main/docs/assets/draco-scored-validation.mp4)
 
 [Watch the DRACO scoring recording as MP4](https://github.com/aa2246740/pi-fusion/raw/main/docs/assets/draco-scored-validation.mp4)
 
-We evaluated Pi Fusion on the same 10-case DRACO benchmark protocol used to compare against the Fusion API budget baseline.
+We evaluated Pi Fusion on a fixed 10-case DRACO validation protocol. Final answers were sealed before the scorer loaded any rubric or scoring artifacts.
 
 | Verification check | Status |
 | --- | --- |
@@ -203,12 +204,11 @@ We evaluated Pi Fusion on the same 10-case DRACO benchmark protocol used to comp
 | Latest validation judge failures | 0 |
 | Public artifact policy | Sanitized aggregate summaries only |
 
-| System / run | full10 score | Delta vs Fusion API budget |
-| --- | ---: | ---: |
-| Fusion API budget baseline | 64.70 | - |
-| Pi Fusion kept validation | 65.30 | +0.60 |
-| Pi Fusion best validation | 66.40 | +1.70 |
-| Pi Fusion latest validation | 66.20 | +1.50 |
+| System / run | DRACO score | Delta vs reported Fusion API | Delta vs reported budget |
+| --- | ---: | ---: | ---: |
+| Pi Fusion latest sealed DRACO-10 validation | **73.80** | **+4.80** | **+9.10** |
+| Reported Fusion API headline result | 69.00 | - | +4.30 |
+| Reported Fusion API budget baseline | 64.70 | -4.30 | - |
 
 The latest validation completed all 10 cases with 0 judge failures.
 

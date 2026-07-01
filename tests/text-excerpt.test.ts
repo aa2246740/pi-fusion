@@ -21,6 +21,26 @@ describe("focused text excerpts", () => {
     expect(excerpt).toContain("$6.424 million");
   });
 
+  it("prefers numeric public-health metric windows over navigation boilerplate", () => {
+    const nav = "Main navigation UNFPA maternal health birth care donate subscribe privacy notice ".repeat(120);
+    const report = "Table 4: antenatal care ANC4 coverage was 71.6% in 2019; neonatal mortality was 27 per 1,000 live births and facility delivery increased over time.";
+    const text = `${nav}${" filler ".repeat(250)}${report}${" tail ".repeat(200)}`;
+    const excerpt = extractFocusedExcerpt(text, "UNFPA maternal birth care ANC4 neonatal mortality facility delivery", { maxChars: 1800, windowChars: 180, maxSnippets: 1 });
+    expect(excerpt).toContain("71.6%");
+    expect(excerpt).toContain("27 per 1,000");
+    expect(excerpt).not.toContain("donate subscribe privacy");
+  });
+
+  it("keeps a complete high-score later snippet instead of prefix-truncating it", () => {
+    const generic = "Renaissance Portfolio debt table mentions loans and SOFR without the exact modified spread. ".repeat(160);
+    const target = "The venture modified the property mortgage loans to reduce the interest rate to SOFR + 1.85% while preserving the scheduled maturity and lender terms.";
+    const text = `${generic}${" filler ".repeat(180)}${target}${" tail ".repeat(120)}`;
+    const excerpt = extractFocusedExcerpt(text, "modified property mortgage loans reduce interest rate SOFR spread", { maxChars: 1100, windowChars: 320, maxSnippets: 4 });
+    expect(excerpt).toContain("SOFR + 1.85%");
+    expect(excerpt).toContain("modified the property mortgage loans");
+    expect(excerpt.length).toBeLessThanOrEqual(1100);
+  });
+
   it("falls back to head and tail when focus is absent", () => {
     const text = `${"head ".repeat(1000)}${"tail ".repeat(1000)}`;
     const excerpt = extractFocusedExcerpt(text, undefined, { maxChars: 1000 });

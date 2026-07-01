@@ -32,6 +32,10 @@ function artifactSummary(result: FusionResult): string {
   return result.artifactsPath ? "Saved; path available in message details" : "Not saved";
 }
 
+function shouldPrintRunDirectory(): boolean {
+  return process.env.PI_FUSION_PRINT_RUN_DIRECTORY === "1";
+}
+
 export function formatFusionDisplayResult(result: FusionResult): string {
   const finalAnswer = result.finalAnswer.trim() || "_No final answer generated._";
   const rows: Array<[string, string | number]> = [
@@ -59,5 +63,6 @@ export function formatFusionDisplayResult(result: FusionResult): string {
     ...rows.map(([key, value]) => `| ${tableCell(key)} | ${tableCell(value)} |`),
     "",
     "Internal judge analysis, verification notes, participant answers, evidence pool, and workspace paths were saved as artifacts/details instead of appended to this user-facing answer.",
+    ...(shouldPrintRunDirectory() && result.artifactsPath ? ["", `Run directory: ${result.artifactsPath}`] : []),
   ].join("\n");
 }

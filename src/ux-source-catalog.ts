@@ -44,8 +44,20 @@ const SOURCES: CatalogSource[] = [
   {
     trigger: /sap|s\/4hana|fiori/i,
     title: "SAP Fiori Design Guidelines",
-    url: "https://experience.sap.com/fiori-design-web/",
+    url: "https://www.sap.com/design-system/fiori-design-web",
     snippet: "Official SAP Fiori UX guidance covering launchpad/app patterns, object pages, forms, navigation, and guided flows.",
+  },
+  {
+    trigger: /sap|s\/4hana|fiori|object page|business object|anchor|section/i,
+    title: "SAP Fiori Elements — Object Page Overview",
+    url: "https://www.sap.com/design-system/fiori-design-web/v1-96/discover/frameworks/sap-fiori-elements/object-page/object-page-overview-sap-fiori-elements",
+    snippet: "Official SAP Fiori Elements guidance for object pages, including business-object layout, header, sections, and navigation patterns.",
+  },
+  {
+    trigger: /sap|s\/4hana|fiori|wizard|guided|step/i,
+    title: "SAP Learning — Working with SAP Fiori Design Guidelines",
+    url: "https://learning.sap.com/courses/ui-development-with-sap-fiori/working-with-sap-fiori-design-guidelines_ab11c169-54de-4f51-87b9-f61c8a5198be",
+    snippet: "Official SAP learning material pointing implementers to Fiori design guidance for consistent application patterns.",
   },
   {
     trigger: /sap|s\/4hana|fiori|inventory|work order|production/i,
@@ -64,6 +76,36 @@ const SOURCES: CatalogSource[] = [
     title: "Oracle NetSuite Help Center — User guides index",
     url: "https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/preface_3710621755.html",
     snippet: "Official Oracle NetSuite help index for product areas such as inventory management, manufacturing, customization, roles/centers, and navigation basics.",
+  },
+  {
+    trigger: /netsuite|oracle|global search|search/i,
+    title: "Oracle NetSuite Help — Global Search",
+    url: "https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_4307693953.html",
+    snippet: "Official NetSuite global-search documentation for finding records from the header search field.",
+  },
+  {
+    trigger: /netsuite|oracle|center|role|dashboard|navigation/i,
+    title: "Oracle NetSuite Help — Centers, Roles, and Dashboards",
+    url: "https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_0713121656.html",
+    snippet: "Official NetSuite guidance for role-based centers, dashboards, and navigation structure.",
+  },
+  {
+    trigger: /netsuite|oracle|item 360|inventory|dashboard/i,
+    title: "Oracle NetSuite Help — Item 360 Dashboard",
+    url: "https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/article_2145345562.html",
+    snippet: "Official NetSuite Item 360 dashboard documentation for inventory-related visibility and action context.",
+  },
+  {
+    trigger: /netsuite|oracle|work order|manufacturing|production/i,
+    title: "NetSuite — Work Order Management",
+    url: "https://www.netsuite.com/portal/products/erp/production-management/work-order-management.shtml",
+    snippet: "Official NetSuite product documentation for work order management and manufacturing execution workflows.",
+  },
+  {
+    trigger: /wizard|guided|step|multi-step|progressive disclosure/i,
+    title: "Nielsen Norman Group — Wizards",
+    url: "https://www.nngroup.com/articles/wizards/",
+    snippet: "UX research guidance on when wizards help by breaking complex workflows into sequential steps, and when they hurt expert efficiency.",
   },
   {
     trigger: /interaction design|progressive disclosure|cognitive load|usability|older|novice/i,
