@@ -8,13 +8,11 @@ Pi Fusion 在 sealed fixed DRACO-10 validation run 上拿到 **73.80**。这比 
 
 我们在固定 10-case DRACO validation protocol 上评估了 Pi Fusion。Final answers sealed 之后，scorer 才加载 rubric 和 scoring artifacts。
 
-## Scoring 录屏
+## 公开证据范围
 
-仓库包含一段 scoring 阶段短录屏：
+Public repository 只包含 sanitized aggregate scores、methodology notes 和 protocol claims。它不公开 raw scorer files、private rubric artifacts、case prompts 或 run internals。
 
-[观看 DRACO scorer 录屏](assets/draco-scored-validation.mp4)
-
-这段视频展示了关键 integrity boundary：final answers 已经 sealed，之后 scorer 才加载 rubric 并产出 DRACO scores。
+关键 integrity boundary 是：final answers sealed 之后，scorer 才加载 rubric artifacts 并产出 DRACO scores。
 
 ## Validation summary
 

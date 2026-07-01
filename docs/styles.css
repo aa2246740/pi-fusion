@@ -957,14 +957,14 @@ pre {
 
 .benchmark-showcase {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(320px, 1.05fr);
   gap: 16px;
   margin-bottom: 16px;
   align-items: stretch;
 }
 
-.benchmark-video,
-.verification-panel {
+.verification-panel,
+.evidence-panel {
   margin: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -972,34 +972,25 @@ pre {
   box-shadow: var(--shadow);
 }
 
-.benchmark-video {
-  overflow: hidden;
-}
-
-.benchmark-video video {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1670 / 1080;
-  background: #020405;
-}
-
-.benchmark-video figcaption {
-  padding: 14px 16px 16px;
-  color: var(--text-dim);
-  font-size: 0.92rem;
-}
-
-.verification-panel {
+.verification-panel,
+.evidence-panel {
   display: grid;
   align-content: start;
   padding: 22px;
 }
 
-.verification-panel h3 {
+.verification-panel h3,
+.evidence-panel h3 {
   margin-bottom: 18px;
 }
 
-.verification-table {
+.evidence-panel p {
+  margin-bottom: 18px;
+  font-size: 0.98rem;
+}
+
+.verification-table,
+.evidence-list {
   display: grid;
   gap: 1px;
   overflow: hidden;
@@ -1008,7 +999,8 @@ pre {
   background: rgba(226, 232, 240, 0.08);
 }
 
-.verification-table > div {
+.verification-table > div,
+.evidence-list > div {
   display: grid;
   grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1fr);
   gap: 12px;
@@ -1016,15 +1008,24 @@ pre {
   background: rgba(5, 9, 12, 0.76);
 }
 
-.verification-table span {
+.verification-table span,
+.evidence-list span {
   color: var(--text-faint);
   font-size: 0.83rem;
 }
 
-.verification-table strong {
+.verification-table strong,
+.evidence-list strong {
   color: var(--text);
   font-size: 0.92rem;
   line-height: 1.3;
+}
+
+.evidence-list a {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-decoration-color: rgba(57, 213, 232, 0.35);
+  text-underline-offset: 3px;
 }
 
 .table-wrap {

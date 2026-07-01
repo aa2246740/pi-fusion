@@ -8,13 +8,11 @@ In this document, **DRACO-verified** means the claim is backed by completed 10-c
 
 We evaluated Pi Fusion on a fixed 10-case DRACO validation protocol. Final answers were sealed before the scorer loaded any rubric or scoring artifacts.
 
-## Scoring recording
+## Public evidence scope
 
-The repository includes a short recording of the scoring stage:
+The public repository includes sanitized aggregate scores, methodology notes, and protocol claims. It does not publish raw scorer files, private rubric artifacts, case prompts, or run internals.
 
-[Watch the DRACO scorer recording](assets/draco-scored-validation.mp4)
-
-The video shows the important integrity boundary: final answers are already sealed before the scorer loads the rubric and emits DRACO scores.
+The important integrity boundary is: final answers were sealed before the scorer loaded rubric artifacts and emitted DRACO scores.
 
 ## Validation summary
 

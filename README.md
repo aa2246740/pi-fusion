@@ -190,11 +190,9 @@ Pi Fusion scored **73.80** on a sealed fixed DRACO-10 validation run, **+4.80 po
 
 In this repository, **DRACO-verified** means the public benchmark claim is backed by completed DRACO 10-case runs, prompt-only generation, scorer-only rubric access, and sanitized aggregate results. It is not an official DRACO certification or a claim that Pi Fusion beats every Fusion API mode on every evaluation.
 
-[![Pi Fusion DRACO scorer recording](https://raw.githubusercontent.com/aa2246740/pi-fusion/main/docs/assets/draco-scored-validation-preview.gif)](https://github.com/aa2246740/pi-fusion/raw/main/docs/assets/draco-scored-validation.mp4)
-
-[Watch the DRACO scoring recording as MP4](https://github.com/aa2246740/pi-fusion/raw/main/docs/assets/draco-scored-validation.mp4)
-
 We evaluated Pi Fusion on a fixed 10-case DRACO validation protocol. Final answers were sealed before the scorer loaded any rubric or scoring artifacts.
+
+The public repository keeps this evidence to aggregate scores, methodology notes, and protocol checks. Raw scorer files, private rubric artifacts, case prompts, and run internals are not published.
 
 | Verification check | Status |
 | --- | --- |

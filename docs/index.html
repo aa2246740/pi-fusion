@@ -176,10 +176,6 @@
             <div><span class="metric-label" data-i18n="metricFailures">Judge failures</span><strong class="metric-value">0</strong></div>
           </div>
           <div class="benchmark-showcase" data-reveal>
-            <figure class="benchmark-video">
-              <video controls preload="metadata" playsinline src="assets/draco-scored-validation.mp4" aria-label="Pi Fusion DRACO scorer recording"></video>
-              <figcaption data-i18n="benchVideoCaption">A real scoring-stage recording: final answers are already sealed, then the scorer loads the rubric and produces DRACO scores.</figcaption>
-            </figure>
             <div class="verification-panel">
               <h3 data-i18n="verifyHeading">Verification checklist</h3>
               <div class="verification-table" role="table" aria-label="DRACO verification checklist">
@@ -188,6 +184,15 @@
                 <div role="row"><span role="cell" data-i18n="verifyRubricLabel">Rubric access</span><strong role="cell" data-i18n="verifyRubricValue">Scorer-only after seal</strong></div>
                 <div role="row"><span role="cell" data-i18n="verifyBaselineLabel">Comparison</span><strong role="cell" data-i18n="verifyBaselineValue">Fusion API 69.00 / budget 64.70</strong></div>
                 <div role="row"><span role="cell" data-i18n="verifyArtifactLabel">Public artifacts</span><strong role="cell" data-i18n="verifyArtifactValue">Sanitized aggregates only</strong></div>
+              </div>
+            </div>
+            <div class="evidence-panel">
+              <h3 data-i18n="evidenceHeading">Public evidence scope</h3>
+              <p data-i18n="evidenceIntro">The homepage keeps the claim to aggregate scores and protocol checks. Raw scorer files, private rubric artifacts, and run internals are not published.</p>
+              <div class="evidence-list" aria-label="Public benchmark evidence">
+                <div><span data-i18n="evidenceScoreLabel">Published result</span><strong>73.80 DRACO-10</strong></div>
+                <div><span data-i18n="evidenceProtocolLabel">Protocol claim</span><strong data-i18n="evidenceProtocolValue">Answers sealed before scoring</strong></div>
+                <div><span data-i18n="evidenceDocsLabel">Details</span><strong><a href="https://github.com/aa2246740/pi-fusion/blob/main/docs/benchmarks.md" data-repo-path="docs/benchmarks.md" data-i18n="docBench">Benchmark notes</a></strong></div>
               </div>
             </div>
           </div>

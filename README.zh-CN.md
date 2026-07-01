@@ -190,11 +190,9 @@ Pi Fusion 在 sealed fixed DRACO-10 validation run 上拿到 **73.80**，比 rep
 
 在这个仓库里，**DRACO verified** 指的是公开 benchmark claim 有完整 DRACO 10-case runs、prompt-only generation、scorer-only rubric access 和 sanitized aggregate results 支撑。它不是 DRACO 官方认证，也不是说 Pi Fusion 在所有评估里超过所有 Fusion API modes。
 
-[![Pi Fusion DRACO scorer recording](https://raw.githubusercontent.com/aa2246740/pi-fusion/main/docs/assets/draco-scored-validation-preview.gif)](https://github.com/aa2246740/pi-fusion/raw/main/docs/assets/draco-scored-validation.mp4)
-
-[观看 DRACO scoring MP4 录屏](https://github.com/aa2246740/pi-fusion/raw/main/docs/assets/draco-scored-validation.mp4)
-
 我们在固定 10-case DRACO validation protocol 上评估了 Pi Fusion。Final answers sealed 之后，scorer 才加载 rubric 和 scoring artifacts。
+
+Public repository 只保留 aggregate scores、methodology notes 和 protocol checks。Raw scorer files、private rubric artifacts、case prompts 和 run internals 不公开发布。
 
 | 验证项 | 状态 |
 | --- | --- |
