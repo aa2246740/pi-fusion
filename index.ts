@@ -503,7 +503,7 @@ function createModelCaller(ctx: ExtensionContext, webBackend?: WebBackend): Mode
         );
       }
 
-      const { complete } = await import("@earendil-works/pi-ai");
+      const { complete } = await import("@earendil-works/pi-ai/compat");
       const tools = await buildToolDefinitions(request.tools ?? [], webBackend);
       const messages: any[] = request.messages.map((m) => ({
         role: "user" as const,

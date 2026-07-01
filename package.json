@@ -1,6 +1,6 @@
 {
   "name": "@aa2246740/pi-fusion",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DRACO-verified model fusion for Pi agents",
   "type": "module",
   "license": "MIT",
@@ -44,20 +44,22 @@
     "check": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-ai": ">=0.80.3 <1",
+    "@earendil-works/pi-coding-agent": ">=0.80.3 <1",
+    "@earendil-works/pi-tui": ">=0.80.3 <1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "jiti": "^2.7.0"
+    "hono": "^4.12.27",
+    "jiti": "^2.7.0",
+    "protobufjs": "^7.6.4"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-ai": "^0.80.3",
+    "@earendil-works/pi-coding-agent": "^0.80.3",
+    "@earendil-works/pi-tui": "^0.80.3",
     "typescript": "^5.8.0",
-    "vitest": "^3.2.0"
+    "vitest": "^4.1.9"
   },
   "pi": {
     "extensions": [
