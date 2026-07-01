@@ -4,8 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <title>Pi Fusion — DRACO-verified model fusion for Pi agents</title>
-    <meta name="description" content="Pi Fusion is DRACO-verified model fusion for Pi agents: scored full10 validation, prompt-only generation, scorer-only rubric access, and local artifacts." />
+    <title>Pi Fusion — 73.80 DRACO-verified model fusion for Pi agents</title>
+    <meta name="description" content="Pi Fusion v0.2.0 scored 73.80 on sealed fixed DRACO-10 validation: +4.80 vs reported Fusion API and +9.10 vs reported budget baseline." />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -40,35 +40,53 @@
         <div class="shell hero-grid">
           <div class="hero-copy">
             <p class="eyebrow" data-reveal data-i18n="heroEyebrow">DRACO-verified model fusion for Pi agents</p>
-            <h1 data-reveal data-i18n="heroHeadline">Not just a fusion demo. Scored on DRACO full10.</h1>
-            <p class="hero-lede" data-reveal data-i18n="heroLede">Pi Fusion turns one high-stakes prompt into independent model answers, then uses judge synthesis, verification, and scorer-only benchmark validation to make the result inspectable instead of just plausible.</p>
+            <h1 data-reveal data-i18n="heroHeadline">Pi Fusion: DRACO-verified model fusion.</h1>
+            <p class="hero-lede" data-reveal data-i18n="heroLede">v0.2.0 scored 73.80 on a sealed fixed DRACO-10 validation run: +4.80 above the reported Fusion API headline result and +9.10 above the reported budget baseline.</p>
             <div class="hero-actions" data-reveal>
-              <a class="button button-primary" href="#install" data-i18n="installCta">Install Pi Fusion</a>
-              <a class="button button-secondary" href="#workflow" data-i18n="workflowCta">See the workflow</a>
+              <a class="button button-primary" href="#benchmarks" data-i18n="benchmarkCta">View DRACO proof</a>
+              <a class="button button-secondary" href="#install" data-i18n="installCta">Install Pi Fusion</a>
               <a class="button button-ghost" href="https://github.com/aa2246740/pi-fusion" data-github-link target="_blank" rel="noreferrer" data-i18n="githubCta">Open GitHub</a>
             </div>
-            <div class="command-card hero-command" data-reveal>
-              <div class="code-head">
-                <span data-i18n="installLabel">Install</span>
-                <button type="button" data-copy="#install-command" data-i18n="copy">Copy</button>
-              </div>
-              <pre id="install-command"><code data-install-command>pi install git:https://github.com/aa2246740/pi-fusion@main</code></pre>
+            <div class="hero-proof-strip" aria-label="Pi Fusion benchmark highlights" data-reveal>
+              <div><span data-i18n="heroScoreLabel">Sealed DRACO-10</span><strong>73.80</strong></div>
+              <div><span data-i18n="heroDeltaLabel">vs Fusion API</span><strong>+4.80</strong></div>
+              <div><span data-i18n="heroBudgetLabel">vs Budget baseline</span><strong>+9.10</strong></div>
+              <div><span data-i18n="heroSealLabel">Completed cases</span><strong>10/10</strong></div>
             </div>
             <p class="trust-row" data-reveal data-i18n="trustRow">DRACO full10 scored · Prompt-only generation · Scorer-only rubric access</p>
           </div>
 
-          <div class="fusion-visual" aria-label="Animated fusion diagram" data-reveal>
-            <div class="visual-shell">
-              <div class="orbit orbit-one" aria-hidden="true"></div>
-              <div class="orbit orbit-two" aria-hidden="true"></div>
-              <div class="beam beam-a" aria-hidden="true"></div>
-              <div class="beam beam-b" aria-hidden="true"></div>
-              <div class="node participant node-a"><span>P1</span></div>
-              <div class="node participant node-b"><span>P2</span></div>
-              <div class="node participant node-c"><span>P3</span></div>
-              <div class="node participant node-d"><span>P4</span></div>
-              <div class="judge-core"><span class="core-label" data-i18n="judge">Judge</span><span class="core-pulse" aria-hidden="true"></span></div>
-              <div class="artifact-card"><span>final-answer.md</span><strong data-i18n="artifactText">Scored artifact trail</strong></div>
+          <div class="score-visual" aria-label="Pi Fusion DRACO score comparison" data-reveal>
+            <div class="score-panel">
+              <div class="score-panel-head">
+                <span data-i18n="scorePanelEyebrow">Latest validation</span>
+                <strong>v0.2.0</strong>
+              </div>
+              <div class="score-main">
+                <span data-i18n="scoreMainLabel">Pi Fusion score</span>
+                <strong data-hero-score="73.80">73.80</strong>
+                <em data-i18n="scoreMainDelta">+4.80 over reported Fusion API</em>
+              </div>
+              <div class="score-bars" aria-label="DRACO score comparison">
+                <div class="score-bar-row score-bar-pi">
+                  <div class="score-bar-copy"><span data-i18n="scoreBarPi">Pi Fusion sealed DRACO-10</span><strong>73.80</strong></div>
+                  <div class="bar-track"><span class="score-bar-fill"></span></div>
+                </div>
+                <div class="score-bar-row score-bar-api">
+                  <div class="score-bar-copy"><span data-i18n="scoreBarFusion">Reported Fusion API</span><strong>69.00</strong></div>
+                  <div class="bar-track"><span class="score-bar-fill"></span></div>
+                </div>
+                <div class="score-bar-row score-bar-budget">
+                  <div class="score-bar-copy"><span data-i18n="scoreBarBudget">Reported budget baseline</span><strong>64.70</strong></div>
+                  <div class="bar-track"><span class="score-bar-fill"></span></div>
+                </div>
+              </div>
+              <div class="score-proof-list">
+                <div class="proof-step"><span>01</span><strong data-i18n="scoreProofPrompt">Prompt-only generation</strong></div>
+                <div class="proof-step"><span>02</span><strong data-i18n="scoreProofScorer">Scorer-only rubric access after seal</strong></div>
+                <div class="proof-step"><span>03</span><strong data-i18n="scoreProofFailures">0 judge failures across 10 cases</strong></div>
+              </div>
+              <a class="score-panel-link" href="#benchmarks" data-i18n="scorePanelLink">Open benchmark evidence</a>
             </div>
           </div>
         </div>
@@ -228,6 +246,13 @@
             <a class="button button-primary" href="https://github.com/aa2246740/pi-fusion" data-github-link target="_blank" rel="noreferrer" data-i18n="githubCta">Open GitHub</a>
             <a class="button button-secondary" href="#commands" data-i18n="configureCta">Configure models</a>
             <a class="button button-ghost" href="#commands" data-i18n="doctorCta">Run /pi-fusion-doctor</a>
+          </div>
+          <div class="command-card install-command-card">
+            <div class="code-head">
+              <span data-i18n="installLabel">Install</span>
+              <button type="button" data-copy="#install-command" data-i18n="copy">Copy</button>
+            </div>
+            <pre id="install-command"><code data-install-command>pi install git:https://github.com/aa2246740/pi-fusion@main</code></pre>
           </div>
         </div>
       </section>

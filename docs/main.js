@@ -10,8 +10,8 @@
 
   const i18n = {
     en: {
-      metaTitle: "Pi Fusion - DRACO-verified model fusion for Pi agents",
-      metaDescription: "Pi Fusion is DRACO-verified model fusion for Pi agents: scored full10 validation, prompt-only generation, scorer-only rubric access, and local artifacts.",
+      metaTitle: "Pi Fusion - 73.80 DRACO-verified model fusion for Pi agents",
+      metaDescription: "Pi Fusion v0.2.0 scored 73.80 on sealed fixed DRACO-10 validation: +4.80 vs reported Fusion API and +9.10 vs reported budget baseline.",
       skip: "Skip to content",
       toggleNav: "Toggle navigation",
       navOverview: "Overview",
@@ -22,16 +22,29 @@
       navGithub: "GitHub",
       languageToggle: "中文",
       heroEyebrow: "DRACO-verified model fusion for Pi agents",
-      heroHeadline: "Not just a fusion demo. Scored on DRACO full10.",
-      heroLede: "Pi Fusion turns one high-stakes prompt into independent model answers, then uses judge synthesis, verification, and scorer-only benchmark validation to make the result inspectable instead of just plausible.",
+      heroHeadline: "Pi Fusion: DRACO-verified model fusion.",
+      heroLede: "v0.2.0 scored 73.80 on a sealed fixed DRACO-10 validation run: +4.80 above the reported Fusion API headline result and +9.10 above the reported budget baseline.",
+      benchmarkCta: "View DRACO proof",
       installCta: "Install Pi Fusion",
       workflowCta: "See the workflow",
       githubCta: "Open GitHub",
       installLabel: "Install",
       copy: "Copy",
+      heroScoreLabel: "Sealed DRACO-10",
+      heroDeltaLabel: "vs Fusion API",
+      heroBudgetLabel: "vs Budget baseline",
+      heroSealLabel: "Completed cases",
       trustRow: "DRACO full10 scored · Prompt-only generation · Scorer-only rubric access",
-      judge: "Judge",
-      artifactText: "Scored artifact trail",
+      scorePanelEyebrow: "Latest validation",
+      scoreMainLabel: "Pi Fusion score",
+      scoreMainDelta: "+4.80 over reported Fusion API",
+      scoreBarPi: "Pi Fusion sealed DRACO-10",
+      scoreBarFusion: "Reported Fusion API",
+      scoreBarBudget: "Reported budget baseline",
+      scoreProofPrompt: "Prompt-only generation",
+      scoreProofScorer: "Scorer-only rubric access after seal",
+      scoreProofFailures: "0 judge failures across 10 cases",
+      scorePanelLink: "Open benchmark evidence",
       problemEyebrow: "The single-model problem",
       problemHeading: "One model answer isn't always enough.",
       problemCopy: "When the stakes are high, a single response can miss tradeoffs, bury contradictions, or commit to one viewpoint before alternatives are even considered.",
@@ -127,8 +140,8 @@
       license: "MIT License",
     },
     zh: {
-      metaTitle: "Pi Fusion - 经过 DRACO 评分验证的 Pi agents 模型融合",
-      metaDescription: "Pi Fusion 是经过 DRACO 评分验证的 Pi agents 模型融合：full10 scored validation、prompt-only generation、scorer-only rubric access 和本地 artifacts。",
+      metaTitle: "Pi Fusion - 73.80 DRACO 评分验证的 Pi agents 模型融合",
+      metaDescription: "Pi Fusion v0.2.0 在 sealed fixed DRACO-10 validation 得到 73.80：+4.80 vs reported Fusion API，+9.10 vs reported budget baseline。",
       skip: "跳到正文",
       toggleNav: "切换导航",
       navOverview: "概览",
@@ -139,16 +152,29 @@
       navGithub: "GitHub",
       languageToggle: "English",
       heroEyebrow: "经过 DRACO 评分验证的 Pi agents 模型融合",
-      heroHeadline: "不只是 fusion demo，而是跑过 DRACO full10 评分。",
-      heroLede: "Pi Fusion 会把高风险问题分发给独立模型，再用 judge synthesis、verification 和 scorer-only benchmark validation，让结果不只是看起来合理，而是可检查、可评分。",
+      heroHeadline: "Pi Fusion:\nDRACO 评分验证\n模型融合。",
+      heroLede: "v0.2.0 sealed DRACO-10 得分 73.80。\n+4.80 vs reported Fusion API。\n+9.10 vs reported budget baseline。",
+      benchmarkCta: "查看 DRACO 证据",
       installCta: "安装 Pi Fusion",
       workflowCta: "查看流程",
       githubCta: "打开 GitHub",
       installLabel: "安装",
       copy: "复制",
-      trustRow: "DRACO full10 scored · Prompt-only generation · Scorer-only rubric access",
-      judge: "裁判",
-      artifactText: "评分 artifact trail",
+      heroScoreLabel: "Sealed DRACO-10",
+      heroDeltaLabel: "相对 Fusion API",
+      heroBudgetLabel: "相对 budget baseline",
+      heroSealLabel: "完成 cases",
+      trustRow: "DRACO full10 评分 · Prompt-only · Scorer-only",
+      scorePanelEyebrow: "最新 validation",
+      scoreMainLabel: "Pi Fusion 得分",
+      scoreMainDelta: "比 reported Fusion API 高 +4.80",
+      scoreBarPi: "Pi Fusion sealed DRACO-10",
+      scoreBarFusion: "Reported Fusion API",
+      scoreBarBudget: "Reported budget baseline",
+      scoreProofPrompt: "Prompt-only generation",
+      scoreProofScorer: "Sealed 之后 scorer-only rubric access",
+      scoreProofFailures: "10 个 cases 中 0 judge failures",
+      scorePanelLink: "打开 benchmark evidence",
       problemEyebrow: "单模型问题",
       problemHeading: "一个模型的答案不总是够用。",
       problemCopy: "当问题重要时，单次回答可能遗漏权衡、掩盖矛盾，或者在充分比较前就锁定一个视角。",
@@ -369,25 +395,27 @@
   function initHero(gsap) {
     const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
     tl.from(".topbar", { y: -18, duration: 0.55 })
-      .from(".hero .eyebrow, .hero h1, .hero-lede, .hero-actions, .hero-command, .trust-row", {
+      .from(".hero .eyebrow, .hero h1, .hero-lede, .hero-actions, .hero-proof-strip, .trust-row", {
         y: 26,
         duration: 0.72,
         stagger: 0.075,
       }, "-=0.15")
-      .from(".visual-shell", { scale: 0.94, duration: 0.85 }, "-=0.58")
-      .from(".participant", { scale: 0.65, stagger: 0.08, duration: 0.45, ease: "back.out(1.8)" }, "-=0.45")
-      .from(".beam", { scaleY: 0, transformOrigin: "top", stagger: 0.12, duration: 0.55 }, "-=0.35")
-      .from(".artifact-card", { y: 18, duration: 0.45 }, "-=0.2");
+      .from(".score-panel", { scale: 0.96, duration: 0.85 }, "-=0.58")
+      .from(".score-main", { y: 18, duration: 0.48 }, "-=0.45")
+      .from(".score-bar-fill", { scaleX: 0, transformOrigin: "left center", stagger: 0.08, duration: 0.56 }, "-=0.28")
+      .from(".proof-step", { y: 12, stagger: 0.06, duration: 0.38 }, "-=0.2");
 
-    gsap.to(".participant", {
-      y: (i) => (i % 2 ? 9 : -9),
-      x: (i) => (i < 2 ? 5 : -5),
-      repeat: -1,
-      yoyo: true,
-      duration: 2.6,
-      ease: "sine.inOut",
-      stagger: { each: 0.22, from: "random" },
-    });
+    const heroScore = document.querySelector("[data-hero-score]");
+    if (heroScore) {
+      gsap.fromTo({ value: 0 }, { value: 73.8 }, {
+        value: 73.8,
+        duration: 0.9,
+        ease: "power2.out",
+        onUpdate() {
+          heroScore.textContent = this.targets()[0].value.toFixed(2);
+        },
+      });
+    }
   }
 
   function initReveals(gsap, ScrollTrigger) {
